@@ -1,7 +1,8 @@
 const MAX_EVENTS = 500;
 const MAX_REPLAY_EVENTS = 5000;
 const MIN_REPLAY_EVENTS = 25;
-const GEMINI_MODEL = "gemini-3.5-flash";
+const RECORDING_MODES = new Set(["activeTab", "allTabs"]);
+const GEMINI_MODEL = "gemini-3.1-flash-lite"; // use this models bc it have most request per days
 const GEMINI_ENDPOINT = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`;
 const AI_PROMPT_FIELD_LIMIT = 3000;
 
@@ -57,7 +58,7 @@ chrome.webRequest.onErrorOccurred.addListener((details) => {
 async function runMessageHandler(message, sender) {
   switch (message.action) {
     case "startRecording":
-      return startRecording();
+      return startRecording(message.mode);
     case "stopRecording":
       return stopRecording();
     case "recordEvent":
@@ -78,6 +79,7 @@ async function runMessageHandler(message, sender) {
         eventBuffer: [],
         replayEvents: [],
         replayStatus: null,
+        eventBuffersByTab: {},
         lastReport: null
       });
       return { ok: true };
@@ -88,7 +90,7 @@ async function runMessageHandler(message, sender) {
   }
 }
 
-async function startRecording() {
+async function startRecording(mode = "activeTab") {
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
   if (!tab?.id) {
     return { ok: false, error: "NO_ACTIVE_TAB" };
@@ -109,12 +111,16 @@ async function startRecording() {
   }
 
   const now = Date.now();
+  const recordingMode = normalizeRecordingMode(mode);
+  const tabKey = String(tab.id);
   const recordingState = {
     isRecording: true,
+    mode: recordingMode,
     startedAt: now,
-    tabId: tab.id,
-    tabUrl: sanitizeUrl(tab.url),
-    tabTitle: tab.title || ""
+    rootTabId: tab.id,
+    tabs: {
+      [tabKey]: buildTabMetadata(tab, now)
+    }
   };
 
   await chrome.storage.local.set({
@@ -127,6 +133,9 @@ async function startRecording() {
       lastBatchAt: null,
       lastBatchSize: 0,
       storageError: null
+    },
+    eventBuffersByTab: {
+      [tabKey]: []
     },
     lastReport: null
   });
@@ -141,6 +150,9 @@ async function startRecording() {
       storageError: null
     }
   });
+  if (recordingMode === "allTabs") {
+    ensureRecordersForOpenTabs(tab.id).catch(() => { });
+  }
 
   return { ok: true, recordingState };
 }
@@ -154,12 +166,13 @@ async function stopRecording() {
   }
 
   const stoppedAt = Date.now();
-  await sendTabMessage(recordingState.tabId, { action: "stopSessionReplay" });
+  await sendTabMessage(recordingState.rootTabId, { action: "stopSessionReplay" });
   await wait(150);
-  await writeQueue.catch(() => {});
+  await writeQueue.catch(() => { });
   const stored = await chrome.storage.local.get([
     "recordingState",
     "eventBuffer",
+    "eventBuffersByTab",
     "replayEvents",
     "replayStatus"
   ]);
@@ -167,6 +180,7 @@ async function stopRecording() {
   const eventBuffer = stored.eventBuffer || [];
   const replayEvents = Array.isArray(stored.replayEvents) ? stored.replayEvents : [];
   const replayStatus = stored.replayStatus || null;
+  const eventBuffersByTab = stored.eventBuffersByTab || {};
 
   await chrome.storage.local.set({
     recordingState: {
@@ -180,24 +194,37 @@ async function stopRecording() {
   let captureResult = { dataUrl: null, error: null };
 
   try {
-    recordedTab = await chrome.tabs.get(recordingState.tabId);
+    recordedTab = await chrome.tabs.get(recordingState.rootTabId);
     if (recordedTab?.id && recordedTab.windowId !== undefined) {
-      await chrome.tabs.update(recordedTab.id, { active: true });
-      captureResult = await captureVisibleTab(recordedTab.windowId);
+      const [activeTab] = await chrome.tabs.query({
+        active: true,
+        windowId: recordedTab.windowId
+      });
+      if (activeTab?.id === recordedTab.id) {
+        captureResult = await captureVisibleTab(recordedTab.windowId);
+      } else {
+        captureResult = {
+          dataUrl: null,
+          error: "Root tab is not active; screenshot skipped."
+        };
+      }
     }
   } catch (error) {
     captureResult = { dataUrl: null, error: error.message || "Capture failed" };
   }
 
+  const tabs = await buildReportTabs(recordingState, eventBuffersByTab);
   const report = {
-    tabUrl: sanitizeUrl(recordedTab?.url || recordingState.tabUrl || ""),
-    tabTitle: recordedTab?.title || recordingState.tabTitle || "",
+    version: 2,
+    mode: normalizeRecordingMode(recordingState.mode),
+    rootTabId: recordingState.rootTabId,
     startedAt: recordingState.startedAt,
     stoppedAt,
     durationSeconds: Math.max(0, Math.round((stoppedAt - recordingState.startedAt) / 1000)),
     events: Array.isArray(eventBuffer) ? eventBuffer : [],
     replayEventCount: replayEvents.length,
     replayStatus,
+    tabs,
     screenshotBase64: captureResult.dataUrl,
     screenshotError: captureResult.error,
     aiExplanation: null
@@ -219,14 +246,14 @@ async function getReplayEvents() {
 }
 
 async function getStatus() {
-  const { recordingState, eventBuffer = [], lastReport, apiConfig } =
-    await chrome.storage.local.get(["recordingState", "eventBuffer", "lastReport", "apiConfig"]);
+  const { recordingState, eventBuffersByTab = {}, lastReport, apiConfig } =
+    await chrome.storage.local.get(["recordingState", "eventBuffersByTab", "lastReport", "apiConfig"]);
 
   return {
     ok: true,
     recordingState: recordingState || { isRecording: false },
     lastReport: lastReport || null,
-    counts: countEvents(eventBuffer),
+    counts: countEvents(getBufferedEvents(eventBuffersByTab)),
     hasApiKey: Boolean(apiConfig?.apiKey)
   };
 }
@@ -260,6 +287,15 @@ async function ensureContentScripts(tabId) {
   }
 
   return (await pingContentScript(tabId)) && (await pingReplayScript(tabId));
+}
+
+async function ensureRecordersForOpenTabs(rootTabId) {
+  const tabs = await chrome.tabs.query({});
+  await Promise.all(tabs.map(async (tab) => {
+    if (!tab?.id || tab.id === rootTabId) return;
+    if (!getRecordablePageInfo(tab.url).recordable) return;
+    await ensureContentScripts(tab.id);
+  }));
 }
 
 function pingContentScript(tabId) {
@@ -327,12 +363,12 @@ function recordNetworkError(event, tabId) {
 }
 
 function enqueueAppendEvent(rawEvent, tabId) {
-  writeQueue = writeQueue.catch(() => {}).then(() => appendEvent(rawEvent, tabId));
+  writeQueue = writeQueue.catch(() => { }).then(() => appendEvent(rawEvent, tabId));
   return writeQueue;
 }
 
 function enqueueAppendReplayEvents(events, tabId) {
-  writeQueue = writeQueue.catch(() => {}).then(() => appendReplayEvents(events, tabId));
+  writeQueue = writeQueue.catch(() => { }).then(() => appendReplayEvents(events, tabId));
   return writeQueue;
 }
 
@@ -340,19 +376,107 @@ async function appendEvent(rawEvent, tabId) {
   const event = sanitizeEvent(rawEvent);
   if (!event) return;
 
-  const { recordingState, eventBuffer = [] } = await chrome.storage.local.get([
+  const { recordingState, eventBuffersByTab = {} } = await chrome.storage.local.get([
     "recordingState",
-    "eventBuffer"
+    "eventBuffersByTab"
   ]);
 
   if (!recordingState?.isRecording) return;
-  if (recordingState.tabId !== tabId) return;
+  if (!shouldRecordTab(recordingState, tabId)) return;
 
-  const nextBuffer = Array.isArray(eventBuffer)
-    ? [...eventBuffer, event].slice(-MAX_EVENTS)
-    : [event];
+  const nextState = await ensureRecordedTab(recordingState, tabId);
+  if (!nextState) return;
 
-  await chrome.storage.local.set({ eventBuffer: nextBuffer });
+  const tabKey = String(tabId);
+  const currentBuffer = Array.isArray(eventBuffersByTab[tabKey])
+    ? eventBuffersByTab[tabKey]
+    : [];
+  const nextBuffers = {
+    ...eventBuffersByTab,
+    [tabKey]: [...currentBuffer, event].slice(-MAX_EVENTS)
+  };
+
+  await chrome.storage.local.set({
+    recordingState: nextState,
+    eventBuffersByTab: nextBuffers
+  });
+}
+
+function normalizeRecordingMode(mode) {
+  return RECORDING_MODES.has(mode) ? mode : "activeTab";
+}
+
+function shouldRecordTab(recordingState, tabId) {
+  if (normalizeRecordingMode(recordingState.mode) === "activeTab") {
+    return recordingState.rootTabId === tabId;
+  }
+  return typeof tabId === "number" && tabId >= 0;
+}
+
+async function ensureRecordedTab(recordingState, tabId) {
+  const tabKey = String(tabId);
+  if (recordingState.tabs?.[tabKey]) return recordingState;
+
+  const tab = await getTabOrNull(tabId);
+  if (tab?.url && !getRecordablePageInfo(tab.url).recordable) return null;
+
+  return {
+    ...recordingState,
+    tabs: {
+      ...(recordingState.tabs || {}),
+      [tabKey]: buildTabMetadata(tab || { id: tabId }, Date.now())
+    }
+  };
+}
+
+async function buildReportTabs(recordingState, eventBuffersByTab) {
+  const tabsById = recordingState.tabs || {};
+  const tabKeys = new Set([
+    ...Object.keys(tabsById),
+    ...Object.keys(eventBuffersByTab || {})
+  ]);
+
+  const tabs = await Promise.all(Array.from(tabKeys).map(async (tabKey) => {
+    const storedTab = tabsById[tabKey] || { tabId: Number(tabKey), url: "", title: "" };
+    const liveTab = await getTabOrNull(storedTab.tabId);
+    const metadata = liveTab ? buildTabMetadata(liveTab, storedTab.startedAt) : storedTab;
+
+    return {
+      tabId: metadata.tabId,
+      url: metadata.url || "",
+      title: metadata.title || "",
+      events: Array.isArray(eventBuffersByTab?.[tabKey]) ? eventBuffersByTab[tabKey] : []
+    };
+  }));
+
+  return tabs.sort((a, b) => {
+    if (a.tabId === recordingState.rootTabId) return -1;
+    if (b.tabId === recordingState.rootTabId) return 1;
+    return a.tabId - b.tabId;
+  });
+}
+
+function buildTabMetadata(tab, startedAt) {
+  return {
+    tabId: tab.id,
+    url: sanitizeUrl(tab.url || ""),
+    title: tab.title || "",
+    startedAt
+  };
+}
+
+async function getTabOrNull(tabId) {
+  try {
+    return await chrome.tabs.get(tabId);
+  } catch {
+    return null;
+  }
+}
+
+function getBufferedEvents(eventBuffersByTab) {
+  return Object.values(eventBuffersByTab || {}).flatMap((events) =>
+    Array.isArray(events) ? events : []
+  );
 }
 
 async function appendReplayEvents(events, tabId) {
@@ -364,7 +488,7 @@ async function appendReplayEvents(events, tabId) {
   ]);
 
   if (!recordingState?.isRecording) return;
-  if (recordingState.tabId !== tabId) return;
+  if (recordingState.rootTabId !== tabId) return;
 
   const nextReplayEvents = Array.isArray(replayEvents)
     ? [...replayEvents, ...events].slice(-MAX_REPLAY_EVENTS)
@@ -503,9 +627,10 @@ function countEvents(events) {
 async function explainLastReport(reportFromPopup) {
   const { apiConfig, lastReport } = await chrome.storage.local.get(["apiConfig", "lastReport"]);
   const report = reportFromPopup || lastReport;
+  const events = getReportEvents(report);
 
   if (!apiConfig?.apiKey) throw new Error("MISSING_API_KEY");
-  if (!report?.events?.length) throw new Error("EMPTY_REPORT");
+  if (!events.length) throw new Error("EMPTY_REPORT");
   if (!hasExplainableError(report)) throw new Error("NO_ERRORS");
 
   const explanation = await explainWithAI(apiConfig.apiKey, report);
@@ -519,7 +644,7 @@ async function explainLastReport(reportFromPopup) {
 }
 
 function hasExplainableError(report) {
-  return report.events.some((event) =>
+  return getReportEvents(report).some((event) =>
     event.type === "jsError" ||
     (event.type === "console" && event.level === "error")
   );
@@ -570,22 +695,23 @@ async function explainWithAI(apiKey, report) {
 }
 
 function buildExplainPrompt(report) {
-  const errors = report.events
+  const events = getReportEvents(report);
+  const errors = events
     .filter((event) => event.type === "jsError")
     .map((event) => `- ${limitForAI(event.message)}${event.stack ? "\n  Stack: " + limitForAI(event.stack) : ""}`)
     .join("\n");
 
-  const consoleErrors = report.events
+  const consoleErrors = events
     .filter((event) => event.type === "console" && event.level === "error")
     .map((event) => `- ${limitForAI(event.message)}`)
     .join("\n");
 
-  const networkErrors = report.events
+  const networkErrors = events
     .filter((event) => event.type === "networkError")
     .map((event) => `- ${event.method} ${limitForAI(event.url)} ${event.statusCode ? "status " + event.statusCode : limitForAI(event.error)}`)
     .join("\n");
 
-  const steps = report.events
+  const steps = events
     .filter((event) => event.type === "click" || event.type === "submit")
     .map((event, index) => `${index + 1}. ${event.type === "submit" ? "Submitted" : "Clicked"} "${event.text || event.selector}"`)
     .join("\n");
@@ -607,6 +733,11 @@ Network request lỗi:
 ${networkErrors || "(không có)"}
 
 Chỉ trả lời đoạn giải thích.`;
+}
+
+function getReportEvents(report) {
+  if (Array.isArray(report?.events)) return report.events;
+  return (report?.tabs || []).flatMap((tab) => Array.isArray(tab.events) ? tab.events : []);
 }
 
 function sanitizeUrl(value) {
