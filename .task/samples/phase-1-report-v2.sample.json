@@ -1,0 +1,56 @@
+{
+  "version": 2,
+  "mode": "allTabs",
+  "rootTabId": 123,
+  "startedAt": 1751800000000,
+  "stoppedAt": 1751800045000,
+  "durationSeconds": 45,
+  "tabs": [
+    {
+      "tabId": 123,
+      "url": "https://example.com/checkout",
+      "title": "Checkout",
+      "events": [
+        {
+          "type": "click",
+          "selector": "button.pay",
+          "text": "Pay now",
+          "timestamp": 1751800015000
+        },
+        {
+          "type": "console",
+          "level": "error",
+          "message": "Payment token missing",
+          "timestamp": 1751800020000
+        }
+      ]
+    },
+    {
+      "tabId": 456,
+      "url": "https://example.com/payment",
+      "title": "Payment",
+      "events": [
+        {
+          "type": "networkError",
+          "method": "POST",
+          "url": "https://example.com/api/pay",
+          "statusCode": 500,
+          "error": "",
+          "timestamp": 1751800024000
+        },
+        {
+          "type": "jsError",
+          "message": "Cannot read properties of undefined (reading 'total')",
+          "source": "https://example.com/app.js",
+          "lineno": 234,
+          "colno": 12,
+          "stack": "TypeError: Cannot read properties of undefined",
+          "timestamp": 1751800028000
+        }
+      ]
+    }
+  ],
+  "screenshotBase64": "data:image/png;base64,...",
+  "screenshotError": null,
+  "aiExplanation": null
+}
