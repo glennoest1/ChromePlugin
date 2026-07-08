@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Bug Black Box Test Page</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f9fafb;
+      --text: #111827;
+      --muted: #6b7280;
+      --border: #d1d5db;
+      --red: #dc2626;
+      --blue: #2563eb;
+    }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font: 16px/1.5 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    main {
+      max-width: 760px;
+      margin: 0 auto;
+      padding: 48px 20px;
+    }
+
+    section {
+      display: grid;
+      gap: 14px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: #ffffff;
+      padding: 22px;
+    }
+
+    h1,
+    p {
+      margin: 0;
+    }
+
+    .muted {
+      color: var(--muted);
+    }
+
+    .actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    button {
+      min-height: 42px;
+      border: 0;
+      border-radius: 8px;
+      padding: 10px 14px;
+      background: var(--blue);
+      color: #ffffff;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    button.danger {
+      background: var(--red);
+    }
+
+    label {
+      display: grid;
+      gap: 6px;
+      font-weight: 700;
+    }
+
+    input {
+      max-width: 360px;
+      min-height: 40px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 8px 10px;
+      font: inherit;
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <section>
+      <h1>Bug Black Box Test Page</h1>
+      <p class="muted">Use this page to demo click capture, console capture, JavaScript error capture, and form submit metadata.</p>
+
+      <div class="actions">
+        <button id="logButton">Write Console Log</button>
+        <button id="typeErrorButton" class="danger">Trigger TypeError</button>
+        <button id="promiseButton" class="danger">Trigger Rejected Promise</button>
+        <button id="networkButton">Trigger Missing File Request</button>
+      </div>
+
+      <form id="demoForm">
+        <label>
+          Demo text input
+          <input id="demoText" name="demoText" type="text" placeholder="Type anything here">
+        </label>
+        <label>
+          Demo password input
+          <input id="demoPassword" name="demoPassword" type="password" placeholder="This value must not be logged">
+        </label>
+        <button type="submit">Submit Demo Form</button>
+      </form>
+    </section>
+  </main>
+
+  <script>
+    document.getElementById("logButton").addEventListener("click", () => {
+      console.log("Demo log: user clicked Write Console Log");
+    });
+
+    document.getElementById("typeErrorButton").addEventListener("click", () => {
+      console.log("About to trigger a real TypeError");
+      const cart = undefined;
+      console.error("Demo console error before the TypeError");
+      cart.total.toFixed(2);
+    });
+
+    document.getElementById("promiseButton").addEventListener("click", () => {
+      Promise.reject(new Error("Demo rejected promise"));
+    });
+
+    document.getElementById("networkButton").addEventListener("click", () => {
+      fetch("./definitely-missing-demo-file.json").catch(() => {
+        console.warn("Missing file request failed as expected");
+      });
+    });
+
+    document.getElementById("demoForm").addEventListener("submit", (event) => {
+      event.preventDefault();
+      console.log("Demo form submitted");
+    });
+  </script>
+</body>
+</html>

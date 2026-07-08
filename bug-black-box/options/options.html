@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Bug Black Box Settings</title>
+  <link rel="stylesheet" href="options.css">
+</head>
+<body>
+  <main class="page">
+    <section class="panel">
+      <h1>Bug Black Box Settings</h1>
+      <p class="muted">Save your Gemini API key locally to enable AI Explain. The key is not hardcoded into the extension.</p>
+
+      <label for="apiKey">Gemini API key</label>
+      <input id="apiKey" type="password" autocomplete="off" spellcheck="false" placeholder="AIza...">
+
+      <div class="actions">
+        <button id="saveButton" class="button button-blue">Save Key</button>
+        <button id="clearButton" class="button button-light">Clear Key</button>
+      </div>
+
+      <p id="status" class="status" role="status"></p>
+    </section>
+  </main>
+  <script src="options.js"></script>
+</body>
+</html>
