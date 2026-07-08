@@ -123,7 +123,7 @@ async function startRecording(mode = "activeTab") {
   });
 
   if (recordingMode === "allTabs") {
-    await ensureRecordersForOpenTabs(tab.id);
+    ensureRecordersForOpenTabs(tab.id).catch(() => {});
   }
 
   return { ok: true, recordingState };
@@ -157,8 +157,18 @@ async function stopRecording() {
   try {
     recordedTab = await chrome.tabs.get(recordingState.rootTabId);
     if (recordedTab?.id && recordedTab.windowId !== undefined) {
-      await chrome.tabs.update(recordedTab.id, { active: true });
-      captureResult = await captureVisibleTab(recordedTab.windowId);
+      const [activeTab] = await chrome.tabs.query({
+        active: true,
+        windowId: recordedTab.windowId
+      });
+      if (activeTab?.id === recordedTab.id) {
+        captureResult = await captureVisibleTab(recordedTab.windowId);
+      } else {
+        captureResult = {
+          dataUrl: null,
+          error: "Root tab is not active; screenshot skipped."
+        };
+      }
     }
   } catch (error) {
     captureResult = { dataUrl: null, error: error.message || "Capture failed" };
