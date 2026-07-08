@@ -147,3 +147,14 @@ popup.js
 - **Console logs missing**: reload the target tab after reloading the extension.
 - **AI Explain says missing key**: save a Gemini API key in Settings.
 - **Network errors missing**: only failed requests in the currently recorded tab are saved.
+
+## Recording Modes
+
+The popup supports two recording modes before Start:
+
+- **Current tab** records only the tab where recording starts.
+- **All tabs** records events from multiple recordable tabs in the same session.
+
+Reports now use contract v2 and group events by `tabs[]`. Each tab entry includes `tabId`, `url`, `title`, and `events`. The screenshot is still captured only from the root tab. See `.task/samples/phase-1-report-v2.sample.json` for the shared sample payload.
+
+In all-tabs mode, event limits are enforced per tab. Reset clears both the old `eventBuffer` compatibility key and the new `eventBuffersByTab` storage.

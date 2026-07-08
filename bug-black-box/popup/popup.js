@@ -2,6 +2,10 @@ const app = document.getElementById("app");
 let statusTimer = null;
 let activeReport = null;
 const PREVIEW_TEXT_LIMIT = 1600;
+const MODE_LABELS = {
+  activeTab: "Current tab",
+  allTabs: "All tabs"
+};
 
 const ERROR_MESSAGES = {
   NO_ACTIVE_TAB: "Không tìm thấy tab đang mở. Hãy mở một trang web bình thường rồi thử lại.",
@@ -52,6 +56,16 @@ function renderIdle(message = "") {
       <p class="muted">Ghi thao tác, console log, lỗi JavaScript, screenshot và failed request thành bug report có cấu trúc.</p>
       ${message ? `<div class="error">${escapeHtml(message)}</div>` : ""}
       <div class="notice">Lưu ý: không bấm Start khi đang ở chrome://extensions. Với trang demo, hãy mở qua localhost hoặc bật quyền file URL cho extension.</div>
+      <div class="mode-picker" role="radiogroup" aria-label="Recording mode">
+        <label>
+          <input type="radio" name="recordingMode" value="activeTab" checked>
+          <span>Current tab</span>
+        </label>
+        <label>
+          <input type="radio" name="recordingMode" value="allTabs">
+          <span>All tabs</span>
+        </label>
+      </div>
       <button class="button button-red" id="startButton">Start Recording</button>
       <p class="muted">Recording chỉ bắt đầu sau khi bạn bấm Start. Extension không ghi input value, password, cookie hoặc request body.</p>
     </section>
@@ -63,6 +77,8 @@ function renderIdle(message = "") {
 
 function renderRecording(recordingState, counts = {}) {
   clearTimer();
+  const tabs = getRecordingTabs(recordingState);
+  const mode = normalizeMode(recordingState.mode);
 
   app.innerHTML = `
     <section class="panel">
@@ -70,12 +86,17 @@ function renderRecording(recordingState, counts = {}) {
         <span class="record-dot" aria-hidden="true"></span>
         <span>Recording... <span id="timer">${formatDuration(recordingState.startedAt)}</span></span>
       </div>
+      <div class="summary-grid">
+        <div><strong>${escapeHtml(MODE_LABELS[mode])}</strong><span>mode</span></div>
+        <div><strong id="tabCount">${tabs.length}</strong><span>tabs</span></div>
+      </div>
       <div class="stats">
         ${stat(counts.console || 0, "logs")}
         ${stat((counts.jsError || 0) + (counts.consoleError || 0), "errors")}
         ${stat((counts.click || 0) + (counts.submit || 0), "actions")}
         ${stat(counts.networkError || 0, "network")}
       </div>
+      <div id="recordingTabList">${mode === "allTabs" ? renderTabList(tabs) : ""}</div>
       <button class="button button-dark" id="stopButton">Stop & Create Report</button>
       <p class="muted">Keep the target tab open until the screenshot is captured.</p>
     </section>
@@ -90,6 +111,7 @@ function renderRecording(recordingState, counts = {}) {
     const status = await sendMessage({ action: "getStatus" });
     if (status?.recordingState?.isRecording) {
       updateStats(status.counts || {});
+      updateRecordingTabs(status.recordingState);
     }
   }, 1000);
 }
@@ -107,12 +129,15 @@ function renderReport(report, hasApiKey = false, aiMessage = "") {
   clearTimer();
   activeReport = report;
 
-  const counts = countEvents(report.events);
+  const tabs = getReportTabs(report);
+  const events = getReportEvents(report);
+  const counts = countEvents(events);
   const hasErrors = counts.jsError + counts.consoleError > 0;
-  const steps = report.events.filter((event) => event.type === "click" || event.type === "submit");
-  const jsErrors = report.events.filter((event) => event.type === "jsError");
-  const networkErrors = report.events.filter((event) => event.type === "networkError");
+  const steps = events.filter((event) => event.type === "click" || event.type === "submit");
+  const jsErrors = events.filter((event) => event.type === "jsError");
+  const networkErrors = events.filter((event) => event.type === "networkError");
   const showExplain = hasErrors;
+  const rootTab = tabs.find((tab) => tab.tabId === report.rootTabId) || tabs[0] || {};
 
   app.innerHTML = `
     <section class="panel">
@@ -124,11 +149,14 @@ function renderReport(report, hasApiKey = false, aiMessage = "") {
         ${hasErrors ? `Found ${counts.jsError + counts.consoleError} JavaScript/console error(s).` : "No JavaScript errors were detected while recording."}
       </div>
       <div class="section">
-        <p><strong>URL:</strong> ${escapeHtml(report.tabUrl || "Unknown")}</p>
+        <p><strong>URL:</strong> ${escapeHtml(rootTab.url || report.tabUrl || "Unknown")}</p>
+        <p><strong>Mode:</strong> ${escapeHtml(MODE_LABELS[normalizeMode(report.mode)] || "Current tab")}</p>
+        <p><strong>Tabs:</strong> ${tabs.length}</p>
         <p><strong>Duration:</strong> ${report.durationSeconds || 0}s</p>
         <p><strong>Captured:</strong> ${counts.console} logs, ${steps.length} actions, ${networkErrors.length} network errors</p>
       </div>
       ${report.screenshotBase64 ? `<img class="preview-image" src="${report.screenshotBase64}" alt="Captured screenshot">` : `<div class="notice">Screenshot unavailable${report.screenshotError ? `: ${escapeHtml(report.screenshotError)}` : ""}</div>`}
+      ${tabs.length > 1 ? `<div class="section"><h3>Captured Tabs</h3>${renderTabList(tabs)}</div>` : ""}
       <div class="section">
         <h3>Steps to Reproduce</h3>
         ${steps.length ? `<ol class="list">${steps.slice(0, 10).map((event) => `<li>${escapeHtml(describeStep(event))}</li>`).join("")}</ol>` : `<p class="muted">No actions captured.</p>`}
@@ -184,10 +212,11 @@ function renderAiBlock(report, hasApiKey, aiMessage) {
 
 async function startRecording() {
   const button = document.getElementById("startButton");
+  const mode = document.querySelector("input[name='recordingMode']:checked")?.value || "activeTab";
   button.disabled = true;
   button.textContent = "Starting...";
 
-  const response = await sendMessage({ action: "startRecording" });
+  const response = await sendMessage({ action: "startRecording", mode });
   if (!response?.ok) {
     renderIdle(buildStartErrorMessage(response));
     return;
@@ -267,18 +296,25 @@ function downloadReport(report) {
 }
 
 function buildMarkdown(report) {
-  const events = report.events || [];
+  const tabs = getReportTabs(report);
+  const events = getReportEvents(report);
   const steps = events.filter((event) => event.type === "click" || event.type === "submit");
   const errors = events.filter((event) => event.type === "jsError");
   const consoleEvents = events.filter((event) => event.type === "console");
   const networkErrors = events.filter((event) => event.type === "networkError");
-  const title = report.tabTitle || report.tabUrl || "Unknown Page";
+  const rootTab = tabs.find((tab) => tab.tabId === report.rootTabId) || tabs[0] || {};
+  const title = rootTab.title || rootTab.url || report.tabTitle || report.tabUrl || "Unknown Page";
 
   return `# Bug Report - ${escapeMarkdown(title)}
 
 **Recorded at:** ${formatDateTime(report.startedAt)}
-**URL:** ${report.tabUrl || "Unknown"}
+**Mode:** ${MODE_LABELS[normalizeMode(report.mode)] || "Current tab"}
+**Root URL:** ${rootTab.url || report.tabUrl || "Unknown"}
+**Captured tabs:** ${tabs.length}
 **Recording duration:** ${report.durationSeconds || 0} seconds
+
+## Captured Tabs
+${tabs.length ? tabs.map((tab, index) => `${index + 1}. ${escapeMarkdown(tab.title || "Untitled")} - ${tab.url || "Unknown"} (${(tab.events || []).length} events)`).join("\n") : "(No tabs captured.)"}
 
 ## Steps to Reproduce
 ${steps.length ? steps.map((event, index) => `${index + 1}. [${formatTime(event.timestamp)}] ${escapeMarkdown(describeStep(event))}`).join("\n") : "(No user actions captured.)"}
@@ -297,7 +333,9 @@ ${report.screenshotBase64 ? `![screenshot](${report.screenshotBase64})` : `Scree
 ${report.aiExplanation ? `
 ## Plain-English Explanation
 > ${report.aiExplanation.replace(/\n/g, "\n> ")}
-` : ""}`;
+` : ""}
+## Raw lastReport
+${fencedJson(report)}`;
 }
 
 function sendMessage(message) {
@@ -317,6 +355,61 @@ function countEvents(events = []) {
     }
     return counts;
   }, { console: 0, consoleError: 0, jsError: 0, click: 0, submit: 0, networkError: 0 });
+}
+
+function getReportTabs(report) {
+  if (Array.isArray(report?.tabs)) return report.tabs;
+  return [{
+    tabId: report?.tabId || report?.rootTabId || 0,
+    url: report?.tabUrl || "",
+    title: report?.tabTitle || "",
+    events: Array.isArray(report?.events) ? report.events : []
+  }];
+}
+
+function getReportEvents(report) {
+  return getReportTabs(report).flatMap((tab) => Array.isArray(tab.events) ? tab.events : []);
+}
+
+function getRecordingTabs(recordingState) {
+  return Object.values(recordingState?.tabs || {}).sort((a, b) => {
+    if (a.tabId === recordingState.rootTabId) return -1;
+    if (b.tabId === recordingState.rootTabId) return 1;
+    return a.tabId - b.tabId;
+  });
+}
+
+function updateRecordingTabs(recordingState) {
+  const tabs = getRecordingTabs(recordingState);
+  const tabCount = document.getElementById("tabCount");
+  const tabList = document.getElementById("recordingTabList");
+
+  if (tabCount) tabCount.textContent = tabs.length;
+  if (tabList) {
+    tabList.innerHTML = normalizeMode(recordingState.mode) === "allTabs"
+      ? renderTabList(tabs)
+      : "";
+  }
+}
+
+function renderTabList(tabs) {
+  if (!tabs.length) return `<p class="muted">No tabs captured yet.</p>`;
+
+  return `
+    <ul class="tab-list">
+      ${tabs.map((tab) => `
+        <li>
+          <strong>${escapeHtml(tab.title || "Untitled")}</strong>
+          <span>${escapeHtml(tab.url || "Unknown URL")}</span>
+          ${Array.isArray(tab.events) ? `<em>${tab.events.length} events</em>` : ""}
+        </li>
+      `).join("")}
+    </ul>
+  `;
+}
+
+function normalizeMode(mode) {
+  return mode === "allTabs" ? "allTabs" : "activeTab";
 }
 
 function stat(value, label) {
@@ -390,6 +483,10 @@ function formatFileDate(date) {
 
 function fenced(text) {
   return "```text\n" + String(text).replace(/```/g, "'''") + "\n```";
+}
+
+function fencedJson(value) {
+  return "```json\n" + JSON.stringify(value, null, 2).replace(/```/g, "'''") + "\n```";
 }
 
 function escapeHtml(value) {
