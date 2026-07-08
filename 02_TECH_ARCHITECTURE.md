@@ -1,4 +1,4 @@
-# Technical Architecture — Bug Black Box
+﻿# Technical Architecture — Bug Black Box
 
 ## Stack
 - Manifest V3
@@ -177,3 +177,14 @@ phải ở content script, để tránh phải inject/remove script liên tục.
 - Giới hạn buffer log tối đa 500 dòng trong 1 session recording để tránh
   storage phình to nếu người dùng quên bấm Stop quá lâu — khi vượt 500, xóa
   bớt các dòng cũ nhất (giữ log gần nhất là quan trọng nhất)
+
+## Multi-tab recording
+
+Popup gui `mode` khi start recording:
+
+- `activeTab`: chi nhan event tu `rootTabId`, giu hanh vi current-tab cu.
+- `allTabs`: nhan event tu nhieu tab recordable trong cung session.
+
+Background giu `recordingState.tabs` cho metadata theo tab va `eventBuffersByTab` cho event buffer theo tab. `appendEvent(rawEvent, tabId)` la diem routing duy nhat: kiem tra mode, them metadata neu tab moi xuat hien, roi append vao buffer cua dung tab. Network error cung di qua cung routing nay nen report luon attach loi mang vao dung tab.
+
+Khi Stop Recording, report sinh ra theo contract v2 (`version`, `mode`, `rootTabId`, `tabs[]`). Screenshot chi chup root tab de tranh tu dong chuyen qua nhieu tab cua nguoi dung. Sample report dung chung nam o `.task/samples/phase-1-report-v2.sample.json`.
