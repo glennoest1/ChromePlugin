@@ -284,18 +284,6 @@ async function stopRecording() {
     "errorScreenshotsByTab"
   ]);
   recordingState = stored.recordingState || recordingState;
-  // <<<<<<< Updated upstream
-  //   const eventBuffer = stored.eventBuffer || [];
-  //   const replayEvents = Array.isArray(stored.replayEvents) ? stored.replayEvents : [];
-  //   const replayStatus = stored.replayStatus || null;
-  //   const finalized = finalizeRecordingSnapshot(
-  //     recordingState,
-  //     stored.eventBuffersByTab || {},
-  //     stoppedAt
-  //   );
-  //   recordingState = finalized.recordingState;
-  //   const eventBuffersByTab = finalized.eventBuffersByTab;
-  // =======
   const eventBuffer = trimEventsByStopTime(stored.eventBuffer || [], stoppedAt);
   const eventBuffersByTab = trimEventBuffersByStopTime(stored.eventBuffersByTab || {}, stoppedAt);
   const reportEvents = getBufferedEvents(eventBuffersByTab);
@@ -308,7 +296,6 @@ async function stopRecording() {
   const replayStatus = buildAggregateReplayStatus(replayStatusByTab, stored.replayStatus);
   const errorScreenshotsByTab = stored.errorScreenshotsByTab || {};
   const hasErrorScreenshots = Object.values(errorScreenshotsByTab).some((screenshot) => screenshot?.dataUrl);
-  // >>>>>>> Stashed changes
 
   await chrome.storage.local.set({
     replayEventsByTab,
@@ -626,7 +613,9 @@ async function appendEvent(rawEvent, tabId) {
     "eventBuffersByTab"
   ]);
 
-  if (!shouldAcceptEventAtCurrentStopState(recordingState, event)) return;
+  const sanitizedEvent = sanitizeEvent(rawEvent);
+  if (!sanitizedEvent) return;
+  if (!shouldAcceptEventAtCurrentStopState(recordingState, sanitizedEvent)) return;
   if (!shouldRecordTab(recordingState, tabId)) return;
 
   const stateWithTab = await ensureRecordedTab(recordingState, tabId);
@@ -636,7 +625,7 @@ async function appendEvent(rawEvent, tabId) {
   const currentBuffer = Array.isArray(eventBuffersByTab[tabKey])
     ? eventBuffersByTab[tabKey]
     : [];
-  const prepared = prepareEvent(rawEvent, tabId, stateWithTab, currentBuffer);
+  const prepared = prepareEvent(sanitizedEvent, tabId, stateWithTab, currentBuffer);
   if (!prepared) return;
 
   const nextState = applyEventToRecordingState(prepared.recordingState, prepared.event);
@@ -654,11 +643,11 @@ async function appendEvent(rawEvent, tabId) {
     eventBuffer: flatEvents
   });
 
-  if (recordingState.isRecording && shouldCaptureScreenshotForEvent(event)) {
-    await maybeCaptureErrorScreenshot(tabId, event);
+  if (recordingState.isRecording && shouldCaptureScreenshotForEvent(prepared.event)) {
+    await maybeCaptureErrorScreenshot(tabId, prepared.event);
   }
 
-  if (recordingState.isRecording && shouldStartReplayFromEvent(recordingState, event)) {
+  if (recordingState.isRecording && shouldStartReplayFromEvent(recordingState, prepared.event)) {
     await startReplayForTab(tabId);
   }
 }
