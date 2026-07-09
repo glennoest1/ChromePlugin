@@ -181,6 +181,7 @@ function renderReport(report, hasApiKey = false, aiMessage = "") {
       <div class="button-row">
         ${replayEventCount ? `<button class="button button-blue" id="replayButton">View Session Replay</button>` : ""}
         <button class="button button-blue" id="downloadButton">Download Report (.md)</button>
+        <button class="button button-yellow" id="downloadJsonButton">Download Raw JSON</button>
         <button class="button button-light" id="resetButton">Clear & Record Again</button>
       </div>
     </section>
@@ -188,6 +189,7 @@ function renderReport(report, hasApiKey = false, aiMessage = "") {
 
   document.getElementById("settingsButton").addEventListener("click", openOptions);
   document.getElementById("downloadButton").addEventListener("click", () => downloadReport(activeReport));
+  document.getElementById("downloadJsonButton").addEventListener("click", () => downloadRawJson(activeReport));
   document.getElementById("resetButton").addEventListener("click", resetReport);
 
   const replayButton = document.getElementById("replayButton");
@@ -310,11 +312,28 @@ function buildStartErrorMessage(response) {
 
 function downloadReport(report) {
   const markdown = buildMarkdown(report);
-  const blob = new Blob([markdown], { type: "text/markdown;charset=utf-8" });
+  downloadTextFile(
+    markdown,
+    `bug-report-${formatFileDate(new Date(report.stoppedAt || Date.now()))}.md`,
+    "text/markdown;charset=utf-8"
+  );
+}
+
+function downloadRawJson(report) {
+  const rawJson = JSON.stringify(buildCompactRawReport(report), null, 2);
+  downloadTextFile(
+    rawJson,
+    `bug-report-${formatFileDate(new Date(report.stoppedAt || Date.now()))}.json`,
+    "application/json;charset=utf-8"
+  );
+}
+
+function downloadTextFile(content, filename, mimeType) {
+  const blob = new Blob([content], { type: mimeType });
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
-  link.download = `bug-report-${formatFileDate(new Date(report.stoppedAt || Date.now()))}.md`;
+  link.download = filename;
   document.body.appendChild(link);
   link.click();
   link.remove();
@@ -366,9 +385,118 @@ ${report.replayEventCount ? `Captured ${report.replayEventCount} replay events. 
 ${report.aiExplanation ? `
 ## Plain-English Explanation
 > ${report.aiExplanation.replace(/\n/g, "\n> ")}
-` : ""}
-## Raw lastReport
-${fencedJson(report)}`;
+` : ""}`;
+}
+
+function buildCompactRawReport(report) {
+  const replayEventCount = Number(report?.replayEventCount || report?.replayEvents?.length || 0);
+  return omitEmptyFields({
+    version: report.version,
+    mode: report.mode,
+    rootTabId: report.rootTabId,
+    startedAt: report.startedAt,
+    stoppedAt: report.stoppedAt,
+    durationSeconds: report.durationSeconds,
+    events: getReportEvents(report).map(compactEvent),
+    globalTimeline: Array.isArray(report.globalTimeline) ? report.globalTimeline : [],
+    replayEventCount,
+    replayEventsSummary: replayEventCount ? `[omitted: ${replayEventCount} rrweb events]` : "",
+    replayStatus: report.replayStatus,
+    tabs: getReportTabs(report).map((tab) => omitEmptyFields({
+      tabId: tab.tabId,
+      url: tab.url,
+      title: tab.title,
+      startedAt: tab.startedAt,
+      activeRanges: tab.activeRanges,
+      eventCount: Array.isArray(tab.events) ? tab.events.length : 0
+    })),
+    screenshotBase64: report.screenshotBase64 ? "[omitted: embedded in Screenshot section]" : null,
+    screenshotError: report.screenshotError,
+    aiExplanation: report.aiExplanation
+  });
+}
+
+function compactEvent(event) {
+  if (!event || typeof event !== "object") return event;
+
+  const base = {
+    type: event.type,
+    tabId: event.tabId,
+    timestamp: event.timestamp,
+    relativeTime: event.relativeTime
+  };
+
+  if (event.type === "click" || event.type === "submit") {
+    return omitEmptyFields({
+      ...base,
+      eventId: event.eventId,
+      selector: event.selector,
+      text: event.text,
+      isSpam: event.isSpam,
+      spamCount: event.spamCount
+    });
+  }
+
+  if (event.type === "network" || event.type === "networkError") {
+    return omitEmptyFields({
+      ...base,
+      source: event.source,
+      method: event.method,
+      url: event.url,
+      statusCode: event.statusCode,
+      durationMs: event.durationMs,
+      error: event.error,
+      triggeredByActionId: event.triggeredByActionId,
+      requestBody: event.requestBody,
+      responseBody: event.responseBody
+    });
+  }
+
+  if (event.type === "console") {
+    return omitEmptyFields({
+      ...base,
+      level: event.level,
+      message: event.message,
+      triggeredByActionId: event.triggeredByActionId
+    });
+  }
+
+  if (event.type === "jsError") {
+    return omitEmptyFields({
+      ...base,
+      message: event.message,
+      source: event.source,
+      lineno: event.lineno,
+      colno: event.colno,
+      stack: event.stack
+    });
+  }
+
+  if (event.type === "tabFocus" || event.type === "tabBlur") {
+    return omitEmptyFields({
+      ...base,
+      windowId: event.windowId
+    });
+  }
+
+  return omitEmptyFields({ ...event });
+}
+
+function omitEmptyFields(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return value;
+
+  return Object.entries(value).reduce((result, [key, fieldValue]) => {
+    if (fieldValue === undefined || fieldValue === null || fieldValue === "") return result;
+    if (Array.isArray(fieldValue) && !fieldValue.length) return result;
+    if (typeof fieldValue === "object" && !Array.isArray(fieldValue)) {
+      const compactValue = omitEmptyFields(fieldValue);
+      if (!Object.keys(compactValue).length) return result;
+      result[key] = compactValue;
+      return result;
+    }
+    result[key] = fieldValue;
+    return result;
+  }, {});
 }
 
 function sendMessage(message) {
@@ -525,10 +653,6 @@ function formatFileDate(date) {
 
 function fenced(text) {
   return "```text\n" + String(text).replace(/```/g, "'''") + "\n```";
-}
-
-function fencedJson(value) {
-  return "```json\n" + JSON.stringify(value, null, 2).replace(/```/g, "'''") + "\n```";
 }
 
 function escapeHtml(value) {

@@ -50,9 +50,9 @@ Recommended demo flow:
    - **Submit Demo Form**
 6. Click the extension icon again.
 7. Click **Stop & Create Report**.
-8. Review the preview and click **Download Report (.md)**.
+8. Review the preview and click **Download Report (.md)**. Use **Download Raw JSON** when you need the structured event payload.
 
-The popup preview may shorten very long error blocks with `...` so the extension UI stays readable. The downloaded Markdown report keeps the full captured console messages, JavaScript error messages, stack traces, and network error lines.
+The popup preview may shorten very long error blocks with `...` so the extension UI stays readable. The downloaded Markdown report keeps the human-readable bug context. The raw compact JSON is exported separately and omits heavy rrweb snapshots and duplicate screenshot data.
 
 If you open `test-page.html` directly as `file://`, enable **Allow access to file URLs** for this extension in `chrome://extensions`, then reload the page.
 
@@ -63,7 +63,7 @@ If you open `test-page.html` directly as `file://`, enable **Allow access to fil
 3. Click **Start Recording**.
 4. Reproduce the bug.
 5. Click **Stop & Create Report**.
-6. Download the Markdown report.
+6. Download the Markdown report, or download the raw JSON payload separately.
 
 Do not start recording from `chrome://extensions` or other `chrome://` pages. Chrome blocks content scripts on internal browser pages.
 
@@ -104,7 +104,7 @@ The extension does not capture:
 - localStorage/sessionStorage dumps.
 - Full unbounded request or response bodies.
 
-Click and submit events store action metadata only. Network logging stores important fetch/XHR request and response metadata: method, sanitized URL, redacted headers, truncated redacted bodies, status code, duration, and browser network error text.
+Click and submit events store action metadata only. Network logging keeps important fetch/XHR request and response metadata for failed requests, action-triggered requests, non-GET requests, or requests with a body. Static assets and common analytics/telemetry noise are skipped. Console logging keeps warnings/errors, plus logs correlated with a recent user action.
 
 Sensitive URL query parameters are redacted when their names include:
 
@@ -136,7 +136,7 @@ content.js (isolated world)
 background.js
   -> chrome.storage.local
 popup.js
-  -> preview/export Markdown
+  -> preview/export Markdown and raw JSON
 ```
 
 ## Troubleshooting

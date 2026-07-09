@@ -10,6 +10,8 @@ const RECORDING_MODES = new Set(["activeTab", "allTabs"]);
 const ACTION_EVENT_TYPES = new Set(["click", "submit"]);
 const CORRELATABLE_EVENT_TYPES = new Set(["console", "network", "networkError"]);
 const SENSITIVE_FIELD_PATTERN = /password|token|secret|authorization|cookie|api[-_]?key|session|set-cookie/i;
+const STATIC_RESOURCE_PATTERN = /\.(?:avif|bmp|css|gif|ico|jpe?g|js|map|mp3|mp4|otf|png|svg|ttf|webm|webp|woff2?)(?:[?#].*)?$/i;
+const NOISY_HOST_PATTERN = /(?:^|\.)((google-analytics|googletagmanager|doubleclick|facebook|hotjar|sentry|segment|mixpanel|clarity|intercom|fullstory)\.com|analytics\.google\.com)$/i;
 const GEMINI_MODEL = "gemini-3.1-flash-lite"; // use this models bc it have most request per days
 const GEMINI_ENDPOINT = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`;
 const AI_PROMPT_FIELD_LIMIT = 3000;
@@ -783,6 +785,14 @@ function prepareEvent(rawEvent, tabId, recordingState, currentBuffer) {
     if (action?.eventId) event.triggeredByActionId = action.eventId;
   }
 
+  if (event.type === "console" && !shouldKeepConsoleEvent(event)) {
+    return null;
+  }
+
+  if (event.type === "network" && !shouldKeepNetworkEvent(event)) {
+    return null;
+  }
+
   return {
     event,
     recordingState: nextState
@@ -827,6 +837,41 @@ function findRecentAction(events, timestamp) {
     return null;
   }
   return null;
+}
+
+function shouldKeepNetworkEvent(event) {
+  const statusCode = Number(event.statusCode);
+  const method = stringifyValue(event.method || "GET").toUpperCase();
+
+  if (event.triggeredByActionId) return true;
+  if (event.error) return true;
+  if (Number.isFinite(statusCode) && statusCode >= 400) return true;
+  if (method !== "GET" && method !== "HEAD") return true;
+  if (event.requestBody) return true;
+  if (isNoisyNetworkUrl(event.url)) return false;
+
+  return false;
+}
+
+function shouldKeepConsoleEvent(event) {
+  if (event.level === "error" || event.level === "warn") return true;
+  return Boolean(event.triggeredByActionId);
+}
+
+function isNoisyNetworkUrl(url) {
+  const value = stringifyValue(url);
+  if (!value) return true;
+  if (/^(?:chrome|chrome-extension|moz-extension|edge|about|data|blob):/i.test(value)) return true;
+
+  try {
+    const parsed = new URL(value);
+    if (STATIC_RESOURCE_PATTERN.test(parsed.pathname)) return true;
+    if (NOISY_HOST_PATTERN.test(parsed.hostname)) return true;
+  } catch {
+    return STATIC_RESOURCE_PATTERN.test(value);
+  }
+
+  return false;
 }
 
 function applyEventToRecordingState(recordingState, event) {
