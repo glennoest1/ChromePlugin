@@ -8,6 +8,7 @@
   --red: #dc2626;
   --red-soft: #fef2f2;
   --blue: #2563eb;
+  --yellow: #f59e0b;
   --green: #15803d;
   --green-soft: #f0fdf4;
   --dark: #374151;
@@ -99,6 +100,11 @@ h3 {
 
 .button-blue {
   background: var(--blue);
+}
+
+.button-yellow {
+  background: var(--yellow);
+  color: #111827;
 }
 
 .button-light {

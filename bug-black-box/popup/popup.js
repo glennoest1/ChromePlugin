@@ -94,7 +94,7 @@ function renderRecording(recordingState, counts = {}) {
         ${stat(counts.console || 0, "logs")}
         ${stat((counts.jsError || 0) + (counts.consoleError || 0), "errors")}
         ${stat((counts.click || 0) + (counts.submit || 0), "actions")}
-        ${stat(counts.networkError || 0, "network")}
+        ${stat((counts.network || 0) + (counts.networkError || 0), "network")}
       </div>
       <div id="recordingTabList">${mode === "allTabs" ? renderTabList(tabs) : ""}</div>
       <button class="button button-dark" id="stopButton">Stop & Create Report</button>
@@ -122,7 +122,7 @@ function updateStats(counts) {
   values[0].textContent = counts.console || 0;
   values[1].textContent = (counts.jsError || 0) + (counts.consoleError || 0);
   values[2].textContent = (counts.click || 0) + (counts.submit || 0);
-  values[3].textContent = counts.networkError || 0;
+  values[3].textContent = (counts.network || 0) + (counts.networkError || 0);
 }
 
 function renderReport(report, hasApiKey = false, aiMessage = "") {
@@ -135,7 +135,8 @@ function renderReport(report, hasApiKey = false, aiMessage = "") {
   const hasErrors = counts.jsError + counts.consoleError > 0;
   const steps = events.filter((event) => event.type === "click" || event.type === "submit");
   const jsErrors = events.filter((event) => event.type === "jsError");
-  const networkErrors = events.filter((event) => event.type === "networkError");
+  const networkEvents = events.filter((event) => event.type === "network" || event.type === "networkError");
+  const networkErrors = events.filter((event) => event.type === "networkError" || (event.type === "network" && (event.error || Number(event.statusCode) >= 400)));
   const showExplain = hasErrors;
   const replayEventCount = Number(report.replayEventCount || 0);
   const replayStatusText = getReplayStatusText(report);
@@ -155,7 +156,7 @@ function renderReport(report, hasApiKey = false, aiMessage = "") {
         <p><strong>Mode:</strong> ${escapeHtml(MODE_LABELS[normalizeMode(report.mode)] || "Current tab")}</p>
         <p><strong>Tabs:</strong> ${tabs.length}</p>
         <p><strong>Duration:</strong> ${report.durationSeconds || 0}s</p>
-        <p><strong>Captured:</strong> ${counts.console} logs, ${steps.length} actions, ${networkErrors.length} network errors</p>
+        <p><strong>Captured:</strong> ${counts.console} logs, ${steps.length} actions, ${networkEvents.length} network request(s)</p>
         <p><strong>Session replay:</strong> ${escapeHtml(replayStatusText)}</p>
       </div>
       ${report.screenshotBase64 ? `<img class="preview-image" src="${report.screenshotBase64}" alt="Captured screenshot">` : `<div class="notice">Screenshot unavailable${report.screenshotError ? `: ${escapeHtml(report.screenshotError)}` : ""}</div>`}
@@ -180,6 +181,7 @@ function renderReport(report, hasApiKey = false, aiMessage = "") {
       <div class="button-row">
         ${replayEventCount ? `<button class="button button-blue" id="replayButton">View Session Replay</button>` : ""}
         <button class="button button-blue" id="downloadButton">Download Report (.md)</button>
+        <button class="button button-yellow" id="downloadJsonButton">Download Raw JSON</button>
         <button class="button button-light" id="resetButton">Clear & Record Again</button>
       </div>
     </section>
@@ -187,6 +189,7 @@ function renderReport(report, hasApiKey = false, aiMessage = "") {
 
   document.getElementById("settingsButton").addEventListener("click", openOptions);
   document.getElementById("downloadButton").addEventListener("click", () => downloadReport(activeReport));
+  document.getElementById("downloadJsonButton").addEventListener("click", () => downloadRawJson(activeReport));
   document.getElementById("resetButton").addEventListener("click", resetReport);
 
   const replayButton = document.getElementById("replayButton");
@@ -309,11 +312,28 @@ function buildStartErrorMessage(response) {
 
 function downloadReport(report) {
   const markdown = buildMarkdown(report);
-  const blob = new Blob([markdown], { type: "text/markdown;charset=utf-8" });
+  downloadTextFile(
+    markdown,
+    `bug-report-${formatFileDate(new Date(report.stoppedAt || Date.now()))}.md`,
+    "text/markdown;charset=utf-8"
+  );
+}
+
+function downloadRawJson(report) {
+  const rawJson = JSON.stringify(buildCompactRawReport(report), null, 2);
+  downloadTextFile(
+    rawJson,
+    `bug-report-${formatFileDate(new Date(report.stoppedAt || Date.now()))}.json`,
+    "application/json;charset=utf-8"
+  );
+}
+
+function downloadTextFile(content, filename, mimeType) {
+  const blob = new Blob([content], { type: mimeType });
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
-  link.download = `bug-report-${formatFileDate(new Date(report.stoppedAt || Date.now()))}.md`;
+  link.download = filename;
   document.body.appendChild(link);
   link.click();
   link.remove();
@@ -326,7 +346,8 @@ function buildMarkdown(report) {
   const steps = events.filter((event) => event.type === "click" || event.type === "submit");
   const errors = events.filter((event) => event.type === "jsError");
   const consoleEvents = events.filter((event) => event.type === "console");
-  const networkErrors = events.filter((event) => event.type === "networkError");
+  const networkEvents = events.filter((event) => event.type === "network" || event.type === "networkError");
+  const networkErrors = networkEvents.filter((event) => event.type === "networkError" || event.error || Number(event.statusCode) >= 400);
   const rootTab = tabs.find((tab) => tab.tabId === report.rootTabId) || tabs[0] || {};
   const title = rootTab.title || rootTab.url || report.tabTitle || report.tabUrl || "Unknown Page";
 
@@ -350,6 +371,9 @@ ${errors.length ? fenced(errors.map(formatError).join("\n\n")) : "(No JavaScript
 ## Network Errors
 ${networkErrors.length ? fenced(networkErrors.map(formatNetworkError).join("\n")) : "(No failed network requests captured.)"}
 
+## Network Requests
+${networkEvents.length ? fenced(networkEvents.map(formatNetworkRequest).join("\n\n")) : "(No network requests captured.)"}
+
 ## Console Log
 ${consoleEvents.length ? fenced(consoleEvents.map(formatConsoleEvent).join("\n")) : "(No console logs captured.)"}
 
@@ -361,9 +385,118 @@ ${report.replayEventCount ? `Captured ${report.replayEventCount} replay events. 
 ${report.aiExplanation ? `
 ## Plain-English Explanation
 > ${report.aiExplanation.replace(/\n/g, "\n> ")}
-` : ""}
-## Raw lastReport
-${fencedJson(report)}`;
+` : ""}`;
+}
+
+function buildCompactRawReport(report) {
+  const replayEventCount = Number(report?.replayEventCount || report?.replayEvents?.length || 0);
+  return omitEmptyFields({
+    version: report.version,
+    mode: report.mode,
+    rootTabId: report.rootTabId,
+    startedAt: report.startedAt,
+    stoppedAt: report.stoppedAt,
+    durationSeconds: report.durationSeconds,
+    events: getReportEvents(report).map(compactEvent),
+    globalTimeline: Array.isArray(report.globalTimeline) ? report.globalTimeline : [],
+    replayEventCount,
+    replayEventsSummary: replayEventCount ? `[omitted: ${replayEventCount} rrweb events]` : "",
+    replayStatus: report.replayStatus,
+    tabs: getReportTabs(report).map((tab) => omitEmptyFields({
+      tabId: tab.tabId,
+      url: tab.url,
+      title: tab.title,
+      startedAt: tab.startedAt,
+      activeRanges: tab.activeRanges,
+      eventCount: Array.isArray(tab.events) ? tab.events.length : 0
+    })),
+    screenshotBase64: report.screenshotBase64 ? "[omitted: embedded in Screenshot section]" : null,
+    screenshotError: report.screenshotError,
+    aiExplanation: report.aiExplanation
+  });
+}
+
+function compactEvent(event) {
+  if (!event || typeof event !== "object") return event;
+
+  const base = {
+    type: event.type,
+    tabId: event.tabId,
+    timestamp: event.timestamp,
+    relativeTime: event.relativeTime
+  };
+
+  if (event.type === "click" || event.type === "submit") {
+    return omitEmptyFields({
+      ...base,
+      eventId: event.eventId,
+      selector: event.selector,
+      text: event.text,
+      isSpam: event.isSpam,
+      spamCount: event.spamCount
+    });
+  }
+
+  if (event.type === "network" || event.type === "networkError") {
+    return omitEmptyFields({
+      ...base,
+      source: event.source,
+      method: event.method,
+      url: event.url,
+      statusCode: event.statusCode,
+      durationMs: event.durationMs,
+      error: event.error,
+      triggeredByActionId: event.triggeredByActionId,
+      requestBody: event.requestBody,
+      responseBody: event.responseBody
+    });
+  }
+
+  if (event.type === "console") {
+    return omitEmptyFields({
+      ...base,
+      level: event.level,
+      message: event.message,
+      triggeredByActionId: event.triggeredByActionId
+    });
+  }
+
+  if (event.type === "jsError") {
+    return omitEmptyFields({
+      ...base,
+      message: event.message,
+      source: event.source,
+      lineno: event.lineno,
+      colno: event.colno,
+      stack: event.stack
+    });
+  }
+
+  if (event.type === "tabFocus" || event.type === "tabBlur") {
+    return omitEmptyFields({
+      ...base,
+      windowId: event.windowId
+    });
+  }
+
+  return omitEmptyFields({ ...event });
+}
+
+function omitEmptyFields(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return value;
+
+  return Object.entries(value).reduce((result, [key, fieldValue]) => {
+    if (fieldValue === undefined || fieldValue === null || fieldValue === "") return result;
+    if (Array.isArray(fieldValue) && !fieldValue.length) return result;
+    if (typeof fieldValue === "object" && !Array.isArray(fieldValue)) {
+      const compactValue = omitEmptyFields(fieldValue);
+      if (!Object.keys(compactValue).length) return result;
+      result[key] = compactValue;
+      return result;
+    }
+    result[key] = fieldValue;
+    return result;
+  }, {});
 }
 
 function sendMessage(message) {
@@ -382,7 +515,7 @@ function countEvents(events = []) {
       counts[event.type] += 1;
     }
     return counts;
-  }, { console: 0, consoleError: 0, jsError: 0, click: 0, submit: 0, networkError: 0 });
+  }, { console: 0, consoleError: 0, jsError: 0, click: 0, submit: 0, network: 0, networkError: 0 });
 }
 
 function getReportTabs(report) {
@@ -469,6 +602,15 @@ function formatNetworkErrorPreview(event) {
   return truncateForPreview(formatNetworkError(event));
 }
 
+function formatNetworkRequest(event) {
+  const status = event.statusCode ? `status ${event.statusCode}` : event.error || "pending/failed";
+  const duration = Number.isFinite(event.durationMs) ? ` in ${event.durationMs}ms` : "";
+  const action = event.triggeredByActionId ? `\nTriggered by: ${event.triggeredByActionId}` : "";
+  const requestBody = event.requestBody ? `\nRequest body: ${event.requestBody}` : "";
+  const responseBody = event.responseBody ? `\nResponse body: ${event.responseBody}` : "";
+  return `[${formatTime(event.timestamp)}] ${event.method || "GET"} ${event.url} - ${status}${duration}${action}${requestBody}${responseBody}`;
+}
+
 function formatConsoleEvent(event) {
   return `[${formatTime(event.timestamp)}] ${String(event.level || "log").toUpperCase()}: ${event.message}`;
 }
@@ -511,10 +653,6 @@ function formatFileDate(date) {
 
 function fenced(text) {
   return "```text\n" + String(text).replace(/```/g, "'''") + "\n```";
-}
-
-function fencedJson(value) {
-  return "```json\n" + JSON.stringify(value, null, 2).replace(/```/g, "'''") + "\n```";
 }
 
 function escapeHtml(value) {

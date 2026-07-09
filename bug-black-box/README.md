@@ -50,9 +50,9 @@ Recommended demo flow:
    - **Submit Demo Form**
 6. Click the extension icon again.
 7. Click **Stop & Create Report**.
-8. Review the preview and click **Download Report (.md)**.
+8. Review the preview and click **Download Report (.md)**. Use **Download Raw JSON** when you need the structured event payload.
 
-The popup preview may shorten very long error blocks with `...` so the extension UI stays readable. The downloaded Markdown report keeps the full captured console messages, JavaScript error messages, stack traces, and network error lines.
+The popup preview may shorten very long error blocks with `...` so the extension UI stays readable. The downloaded Markdown report keeps the human-readable bug context. The raw compact JSON is exported separately and omits heavy rrweb snapshots and duplicate screenshot data.
 
 If you open `test-page.html` directly as `file://`, enable **Allow access to file URLs** for this extension in `chrome://extensions`, then reload the page.
 
@@ -63,7 +63,7 @@ If you open `test-page.html` directly as `file://`, enable **Allow access to fil
 3. Click **Start Recording**.
 4. Reproduce the bug.
 5. Click **Stop & Create Report**.
-6. Download the Markdown report.
+6. Download the Markdown report, or download the raw JSON payload separately.
 
 Do not start recording from `chrome://extensions` or other `chrome://` pages. Chrome blocks content scripts on internal browser pages.
 
@@ -102,10 +102,9 @@ The extension does not capture:
 - `contenteditable` content.
 - Cookies.
 - localStorage/sessionStorage dumps.
-- Request bodies.
-- Response bodies.
+- Full unbounded request or response bodies.
 
-Click and submit events store action metadata only. Network logging stores only method, sanitized URL, status code, and browser network error text.
+Click and submit events store action metadata only. Network logging keeps important fetch/XHR request and response metadata for failed requests, action-triggered requests, non-GET requests, or requests with a body. Static assets and common analytics/telemetry noise are skipped. Console logging keeps warnings/errors, plus logs correlated with a recent user action.
 
 Sensitive URL query parameters are redacted when their names include:
 
@@ -137,7 +136,7 @@ content.js (isolated world)
 background.js
   -> chrome.storage.local
 popup.js
-  -> preview/export Markdown
+  -> preview/export Markdown and raw JSON
 ```
 
 ## Troubleshooting
@@ -146,7 +145,7 @@ popup.js
 - **Testing file:// fails**: enable **Allow access to file URLs** for Bug Black Box and reload the file tab.
 - **Console logs missing**: reload the target tab after reloading the extension.
 - **AI Explain says missing key**: save a Gemini API key in Settings.
-- **Network errors missing**: only failed requests in the currently recorded tab are saved.
+- **Network requests missing**: fetch/XHR requests are captured from recorded tabs; browser/static asset requests may only appear when Chrome reports them as failures.
 
 ## Recording Modes
 
@@ -155,6 +154,6 @@ The popup supports two recording modes before Start:
 - **Current tab** records only the tab where recording starts.
 - **All tabs** records events from multiple recordable tabs in the same session.
 
-Reports now use contract v2 and group events by `tabs[]`. Each tab entry includes `tabId`, `url`, `title`, and `events`. The screenshot is still captured only from the root tab. See `.task/samples/phase-1-report-v2.sample.json` for the shared sample payload.
+Reports now use contract v3 and group events by `tabs[]`. Each event includes `tabId` and `relativeTime`; actions include `eventId`; network and console events may include `triggeredByActionId`; tab metadata includes `activeRanges`; and `globalTimeline[]` provides chronological cross-tab references. The screenshot is still captured only from the root tab. See `.task/samples/phase-1-report-v3.sample.json` for the shared sample payload.
 
 In all-tabs mode, event limits are enforced per tab. Reset clears both the old `eventBuffer` compatibility key and the new `eventBuffersByTab` storage.
