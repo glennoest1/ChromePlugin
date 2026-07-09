@@ -1,0 +1,212 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Privacy Policy - Bug Black Box</title>
+  <meta name="description" content="Privacy policy for the Bug Black Box Chrome extension.">
+  <style>
+    :root {
+      --ink: #172026;
+      --muted: #5d6872;
+      --line: #d7dde3;
+      --paper: #f7f8f4;
+      --panel: #ffffff;
+      --accent: #0f6b5f;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      color: var(--ink);
+      background: var(--paper);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      line-height: 1.6;
+    }
+
+    a {
+      color: var(--accent);
+    }
+
+    header {
+      border-bottom: 1px solid var(--line);
+      background: var(--panel);
+    }
+
+    .topbar,
+    main {
+      width: min(920px, calc(100% - 40px));
+      margin: 0 auto;
+    }
+
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 20px;
+      min-height: 68px;
+    }
+
+    .brand {
+      display: inline-flex;
+      align-items: center;
+      gap: 12px;
+      color: var(--ink);
+      font-weight: 750;
+      text-decoration: none;
+    }
+
+    .brand img {
+      width: 32px;
+      height: 32px;
+      border-radius: 7px;
+    }
+
+    main {
+      padding: 54px 0 70px;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: clamp(38px, 7vw, 64px);
+      line-height: 1;
+      letter-spacing: 0;
+    }
+
+    h2 {
+      margin: 38px 0 10px;
+      font-size: 24px;
+      line-height: 1.2;
+      letter-spacing: 0;
+    }
+
+    p,
+    li {
+      color: var(--muted);
+    }
+
+    .lead {
+      max-width: 760px;
+      margin: 18px 0 0;
+      color: var(--muted);
+      font-size: 18px;
+    }
+
+    .summary {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 14px;
+      margin: 32px 0 12px;
+    }
+
+    .item {
+      padding: 18px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--panel);
+    }
+
+    .item strong {
+      display: block;
+      margin-bottom: 6px;
+    }
+
+    .item p {
+      margin: 0;
+    }
+
+    code {
+      color: var(--ink);
+      background: rgba(15, 107, 95, 0.1);
+      border-radius: 5px;
+      padding: 2px 5px;
+    }
+
+    @media (max-width: 680px) {
+      .topbar {
+        align-items: flex-start;
+        flex-direction: column;
+        padding: 16px 0;
+      }
+
+      .summary {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="topbar">
+      <a class="brand" href="./index.html">
+        <img src="./icon128.png" alt="">
+        <span>Bug Black Box</span>
+      </a>
+      <a href="./index.html">Back to Website</a>
+    </div>
+  </header>
+
+  <main>
+    <h1>Privacy Policy</h1>
+    <p class="lead">This policy describes the data handled by the Bug Black Box Chrome extension. Last updated: July 9, 2026.</p>
+
+    <div class="summary">
+      <div class="item">
+        <strong>Recording is explicit</strong>
+        <p>Bug Black Box records only after the user clicks Start Recording.</p>
+      </div>
+      <div class="item">
+        <strong>No Bug Black Box backend</strong>
+        <p>This phase does not upload reports, screenshots, or replay data to a Bug Black Box server.</p>
+      </div>
+    </div>
+
+    <h2>Data the Extension Records</h2>
+    <p>During an active recording session, Bug Black Box may collect browser context needed to reproduce and debug a web issue:</p>
+    <ul>
+      <li>Page URL and title for recorded tabs.</li>
+      <li>Console logs and console errors emitted by the page.</li>
+      <li>JavaScript error messages and stack traces.</li>
+      <li>User click and submit metadata, such as a selector and safe visible label text.</li>
+      <li>Failed network request metadata, including method, sanitized URL, status code, and browser network error text.</li>
+      <li>A screenshot of the visible viewport from the root tab when recording stops, when Chrome allows capture.</li>
+      <li>rrweb session replay events for local playback in the extension replay viewer.</li>
+    </ul>
+
+    <h2>Data the Extension Avoids Recording</h2>
+    <p>Bug Black Box is designed to avoid intentionally storing sensitive values that are not needed for bug reports:</p>
+    <ul>
+      <li>Password input values.</li>
+      <li>Text typed into normal input fields.</li>
+      <li>Text area content.</li>
+      <li><code>contenteditable</code> content.</li>
+      <li>Cookies.</li>
+      <li>Full <code>localStorage</code> or <code>sessionStorage</code> dumps.</li>
+      <li>Request bodies, response bodies, and request cookies.</li>
+    </ul>
+
+    <h2>Session Replay</h2>
+    <p>Session replay is recorded through rrweb. Replay data can include DOM session data, mouse interactions, scroll activity, and page changes needed for playback. rrweb input masking is enabled with <code>maskAllInputs: true</code>, and the extension also records action logs without typed input values.</p>
+    <p>Replay data is stored locally in Chrome extension storage and is played back by the local replay viewer bundled with the extension. Replay data is not uploaded to a Bug Black Box backend in this phase.</p>
+
+    <h2>AI Explain</h2>
+    <p>AI Explain is optional. The extension calls Gemini only when the user saves a Gemini API key and clicks Explain with AI on a report.</p>
+    <p>The Gemini API key is stored locally in <code>chrome.storage.local</code>. When AI Explain is used, Bug Black Box sends selected report context to Gemini, including user action steps, JavaScript errors, console errors, and failed network request summaries. Long fields may be shortened before sending. Screenshots and rrweb replay events are not sent by the AI Explain request.</p>
+
+    <h2>Storage and Sharing</h2>
+    <p>Reports, replay events, screenshots, recording state, and the optional Gemini API key are stored in <code>chrome.storage.local</code>. The user can export a Markdown report. The user controls where exported reports are saved or shared.</p>
+
+    <h2>URL Redaction</h2>
+    <p>Bug Black Box removes URL fragments and redacts query parameter values when parameter names include sensitive terms such as <code>password</code>, <code>token</code>, <code>secret</code>, <code>authorization</code>, <code>cookie</code>, <code>apiKey</code>, or <code>session</code>.</p>
+
+    <h2>Permissions</h2>
+    <p>The extension uses Chrome permissions only to provide its single purpose: recording browser bug context after explicit user action. The extension uses storage for local reports and settings, activeTab/tabs/scripting for tab access and content script injection, webRequest for failed request metadata, and host permissions for recordable pages plus the Gemini endpoint when AI Explain is used.</p>
+
+    <h2>Contact</h2>
+    <p>Use the support contact listed in the Chrome Web Store listing for privacy questions or deletion requests. Local extension data can also be removed by clearing the extension data in Chrome or uninstalling the extension.</p>
+  </main>
+</body>
+</html>

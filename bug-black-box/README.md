@@ -2,6 +2,8 @@
 
 Bug Black Box is a Chrome Manifest V3 extension for recording the useful context around a web app bug: user actions, console logs, JavaScript errors, failed network requests, and a screenshot. It exports a Markdown report that can be shared with a developer or used for AI-assisted debugging.
 
+Phase 1 also includes multi-tab recording, rrweb session replay, a local replay viewer, and Markdown export with the raw report JSON included.
+
 ## Install
 
 1. Open `chrome://extensions`.
@@ -60,10 +62,11 @@ If you open `test-page.html` directly as `file://`, enable **Allow access to fil
 
 1. Open a normal website, localhost page, or the demo page.
 2. Click the extension icon.
-3. Click **Start Recording**.
-4. Reproduce the bug.
-5. Click **Stop & Create Report**.
-6. Download the Markdown report.
+3. Choose **Current tab** or **All tabs**.
+4. Click **Start Recording**.
+5. Reproduce the bug.
+6. Click **Stop & Create Report**.
+7. Review the report, open replay if captured, and download the Markdown report.
 
 Do not start recording from `chrome://extensions` or other `chrome://` pages. Chrome blocks content scripts on internal browser pages.
 
@@ -85,7 +88,7 @@ For very large reports, the prompt sent to Gemini may shorten long fields with `
 Implementation details:
 
 ```text
-Endpoint: https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent
+Endpoint: https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent
 Header:   x-goog-api-key: <YOUR_GEMINI_API_KEY>
 Storage:  chrome.storage.local -> apiConfig.apiKey
 ```
@@ -121,8 +124,11 @@ bug-black-box/
   background.js
   content.js
   injected.js
+  session-recorder.js
   popup/
   options/
+  replay/
+  vendor/
   icons/
   scripts/generate_icons.py
 ```
@@ -134,11 +140,29 @@ injected.js (MAIN world)
   -> window.postMessage
 content.js (isolated world)
   -> chrome.runtime.sendMessage
+session-recorder.js
+  -> rrweb events
 background.js
   -> chrome.storage.local
 popup.js
-  -> preview/export Markdown
+  -> preview/replay/export Markdown
 ```
+
+## Release Packaging
+
+From the repository root, run:
+
+```powershell
+.\package.ps1
+```
+
+The script reads the manifest version and writes:
+
+```text
+dist/bug-black-box-v<version>.zip
+```
+
+The package contains extension files only. Website files, repository docs, `.git`, `.task`, and test pages are not included.
 
 ## Troubleshooting
 

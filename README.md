@@ -6,14 +6,15 @@ Project này là bản demo chạy trực tiếp bằng **Chrome Manifest V3**, 
 
 ## Tính Năng
 
-- Start/Stop recording trên tab hiện tại.
+- Start/Stop recording trên tab hiện tại hoặc nhiều tab.
 - Bắt `console.log`, `console.warn`, `console.error`.
 - Bắt lỗi JavaScript từ `window.onerror` và `unhandledrejection`.
 - Ghi lại click và submit form theo dạng metadata.
 - Chụp ảnh viewport khi bấm Stop.
 - Log network request lỗi bằng `chrome.webRequest` với status `>= 400` hoặc request fail.
-- Xuất report Markdown `.md` có steps, errors, console log, network errors và screenshot base64.
-- AI Explain dùng Anthropic API để giải thích lỗi bằng ngôn ngữ dễ hiểu.
+- Ghi session replay bằng rrweb và xem lại bằng replay viewer local.
+- Xuất report Markdown `.md` có steps, errors, console log, network errors, screenshot base64 và raw JSON.
+- AI Explain dùng Gemini API để giải thích lỗi bằng ngôn ngữ dễ hiểu.
 - Trang Options để người dùng tự nhập API key, không hardcode key.
 
 ## Cài Đặt
@@ -79,6 +80,30 @@ Sau đó mở:
 http://localhost:8080/test-page.html
 ```
 
+## Website và Release Package
+
+Website tĩnh cho Chrome Web Store nằm trong `docs/`:
+
+- `docs/index.html`: landing page public.
+- `docs/privacy.html`: privacy policy public.
+- `docs/icon128.png`: icon dùng cho website.
+
+Trước khi submit Chrome Web Store, deploy `docs/` lên GitHub Pages, Vercel, Netlify hoặc Cloudflare Pages và dùng URL public của `privacy.html` trong dashboard.
+
+Tạo ZIP release bằng PowerShell:
+
+```powershell
+.\package.ps1
+```
+
+Script đọc version từ `bug-black-box/manifest.json` và tạo:
+
+```text
+dist/bug-black-box-v<version>.zip
+```
+
+ZIP chỉ chứa nội dung extension cần upload, không chứa planning docs, website, `.git`, `.task` hoặc test page.
+
 ## Cách Dùng
 
 ### 1. Bắt đầu ghi
@@ -142,7 +167,7 @@ Screenshot được nhúng trực tiếp bằng base64, nên file Markdown có t
 
 ## AI Explain
 
-AI Explain gửi thông tin lỗi trong report lên Anthropic Messages API để tạo đoạn giải thích ngắn, dễ hiểu.
+AI Explain gửi thông tin lỗi trong report lên Gemini API để tạo đoạn giải thích ngắn, dễ hiểu.
 
 Extension không có API key mặc định và không hardcode key vào source code.
 
@@ -150,7 +175,7 @@ Extension không có API key mặc định và không hardcode key vào source c
 
 1. Mở popup Bug Black Box.
 2. Bấm nút Settings.
-3. Nhập Anthropic API key vào ô **Anthropic API key**.
+3. Nhập Gemini API key vào ô **Gemini API key**.
 4. Bấm **Save Key**.
 
 API key được lưu trong `chrome.storage.local` tại:
@@ -166,14 +191,13 @@ apiConfig.apiKey
 3. Extension sẽ gọi:
 
 ```text
-POST https://api.anthropic.com/v1/messages
+POST https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent
 ```
 
-Header dùng đúng định dạng của Anthropic:
+Header dùng đúng định dạng của Gemini:
 
 ```text
-x-api-key: <API_KEY>
-anthropic-version: 2023-06-01
+x-goog-api-key: <API_KEY>
 content-type: application/json
 ```
 
@@ -236,6 +260,7 @@ bug-black-box/
   background.js
   content.js
   injected.js
+  session-recorder.js
   popup/
     popup.html
     popup.css
@@ -244,6 +269,14 @@ bug-black-box/
     options.html
     options.css
     options.js
+  replay/
+    replay.html
+    replay.css
+    replay.js
+  vendor/
+    rrweb.min.js
+    rrweb-player.min.js
+    rrweb-player.css
   icons/
     icon16.png
     icon48.png
@@ -258,9 +291,11 @@ Vai trò chính:
 - `manifest.json`: khai báo Manifest V3, popup, options page, permissions, content scripts.
 - `injected.js`: chạy trong MAIN world để override console và bắt JS error.
 - `content.js`: nhận `postMessage` từ `injected.js`, ghi click/submit an toàn, forward event lên background.
-- `background.js`: quản lý recording state, buffer, screenshot, report, network error log và AI Explain.
+- `session-recorder.js`: ghi rrweb replay event khi recording bắt đầu.
+- `background.js`: quản lý recording state, buffer theo tab, screenshot, report, replay data, network error log và AI Explain.
 - `popup/`: giao diện Start, Stop, Preview, Export.
-- `options/`: lưu/xóa Anthropic API key.
+- `replay/`: replay viewer local cho rrweb events đã lưu.
+- `options/`: lưu/xóa Gemini API key.
 - `scripts/generate_icons.py`: tạo icon bằng Pillow.
 
 ## Kiểm Tra Thủ Công
@@ -296,7 +331,7 @@ Ngoài ra, log chỉ được lưu nếu xảy ra sau khi đã bấm **Start Rec
 
 ### AI Explain báo thiếu API key
 
-Mở Settings của extension, nhập Anthropic API key và bấm Save Key.
+Mở Settings của extension, nhập Gemini API key và bấm Save Key.
 
 ### Network error không xuất hiện
 
@@ -325,6 +360,9 @@ Recording state được lưu trong `chrome.storage.local`:
 ```text
 recordingState
 eventBuffer
+eventBuffersByTab
+replayEvents
+replayStatus
 lastReport
 apiConfig
 ```
