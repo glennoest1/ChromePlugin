@@ -137,6 +137,8 @@ function renderReport(report, hasApiKey = false, aiMessage = "") {
   const jsErrors = events.filter((event) => event.type === "jsError");
   const networkErrors = events.filter((event) => event.type === "networkError");
   const showExplain = hasErrors;
+  const replayEventCount = Number(report.replayEventCount || 0);
+  const replayStatusText = getReplayStatusText(report);
   const rootTab = tabs.find((tab) => tab.tabId === report.rootTabId) || tabs[0] || {};
 
   app.innerHTML = `
@@ -154,6 +156,7 @@ function renderReport(report, hasApiKey = false, aiMessage = "") {
         <p><strong>Tabs:</strong> ${tabs.length}</p>
         <p><strong>Duration:</strong> ${report.durationSeconds || 0}s</p>
         <p><strong>Captured:</strong> ${counts.console} logs, ${steps.length} actions, ${networkErrors.length} network errors</p>
+        <p><strong>Session replay:</strong> ${escapeHtml(replayStatusText)}</p>
       </div>
       ${report.screenshotBase64 ? `<img class="preview-image" src="${report.screenshotBase64}" alt="Captured screenshot">` : `<div class="notice">Screenshot unavailable${report.screenshotError ? `: ${escapeHtml(report.screenshotError)}` : ""}</div>`}
       ${tabs.length > 1 ? `<div class="section"><h3>Captured Tabs</h3>${renderTabList(tabs)}</div>` : ""}
@@ -175,6 +178,7 @@ function renderReport(report, hasApiKey = false, aiMessage = "") {
       ` : ""}
       ${showExplain ? renderAiBlock(report, hasApiKey, aiMessage) : ""}
       <div class="button-row">
+        ${replayEventCount ? `<button class="button button-blue" id="replayButton">View Session Replay</button>` : ""}
         <button class="button button-blue" id="downloadButton">Download Report (.md)</button>
         <button class="button button-light" id="resetButton">Clear & Record Again</button>
       </div>
@@ -184,6 +188,9 @@ function renderReport(report, hasApiKey = false, aiMessage = "") {
   document.getElementById("settingsButton").addEventListener("click", openOptions);
   document.getElementById("downloadButton").addEventListener("click", () => downloadReport(activeReport));
   document.getElementById("resetButton").addEventListener("click", resetReport);
+
+  const replayButton = document.getElementById("replayButton");
+  if (replayButton) replayButton.addEventListener("click", openReplayPage);
 
   const explainButton = document.getElementById("explainButton");
   if (explainButton) explainButton.addEventListener("click", explainWithAI);
@@ -276,6 +283,24 @@ function openOptions() {
   chrome.runtime.openOptionsPage();
 }
 
+function getReplayStatusText(report) {
+  const replayEventCount = Number(report.replayEventCount || 0);
+  if (replayEventCount) return `${replayEventCount} events captured`;
+
+  const status = report.replayStatus || {};
+  if (status.storageError) return `not captured (${status.storageError})`;
+  if (status.startError) return `not captured (${status.startError})`;
+  if (status.started === false) return "not captured (recorder did not start)";
+  if (status.lastBatchAt && !replayEventCount) return "not captured (storage saved 0 events)";
+  return "not captured";
+}
+
+function openReplayPage() {
+  chrome.tabs.create({
+    url: chrome.runtime.getURL("replay/replay.html")
+  });
+}
+
 function buildStartErrorMessage(response) {
   const baseMessage = ERROR_MESSAGES[response?.error] || "Không thể bắt đầu recording.";
   const tabUrl = response?.tabUrl ? `\nTab hiện tại: ${response.tabUrl}` : "";
@@ -330,6 +355,9 @@ ${consoleEvents.length ? fenced(consoleEvents.map(formatConsoleEvent).join("\n")
 
 ## Screenshot
 ${report.screenshotBase64 ? `![screenshot](${report.screenshotBase64})` : `Screenshot unavailable${report.screenshotError ? `: ${report.screenshotError}` : "."}`}
+
+## Session Replay
+${report.replayEventCount ? `Captured ${report.replayEventCount} replay events. Open the extension replay viewer to watch the session.` : "No session replay was captured."}
 ${report.aiExplanation ? `
 ## Plain-English Explanation
 > ${report.aiExplanation.replace(/\n/g, "\n> ")}

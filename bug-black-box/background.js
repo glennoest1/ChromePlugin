@@ -1,4 +1,6 @@
 const MAX_EVENTS = 500;
+const MAX_REPLAY_EVENTS = 5000;
+const MIN_REPLAY_EVENTS = 25;
 const RECORDING_MODES = new Set(["activeTab", "allTabs"]);
 const GEMINI_MODEL = "gemini-3.1-flash-lite"; // use this models bc it have most request per days
 const GEMINI_ENDPOINT = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`;
@@ -63,12 +65,20 @@ async function runMessageHandler(message, sender) {
       if (!sender.tab?.id) return { ok: true, ignored: true };
       await enqueueAppendEvent(message.payload, sender.tab.id);
       return { ok: true };
+    case "recordReplayEvents":
+      if (!sender.tab?.id) return { ok: true, ignored: true };
+      await enqueueAppendReplayEvents(message.events, sender.tab.id);
+      return { ok: true };
+    case "getReplayEvents":
+      return getReplayEvents();
     case "getStatus":
       return getStatus();
     case "resetReport":
       await chrome.storage.local.set({
         recordingState: { isRecording: false },
         eventBuffer: [],
+        replayEvents: [],
+        replayStatus: null,
         eventBuffersByTab: {},
         lastReport: null
       });
@@ -116,14 +126,32 @@ async function startRecording(mode = "activeTab") {
   await chrome.storage.local.set({
     recordingState,
     eventBuffer: [],
+    replayEvents: [],
+    replayStatus: {
+      started: false,
+      startError: null,
+      lastBatchAt: null,
+      lastBatchSize: 0,
+      storageError: null
+    },
     eventBuffersByTab: {
       [tabKey]: []
     },
     lastReport: null
   });
 
+  const replayStart = await sendTabMessage(tab.id, { action: "startSessionReplay" });
+  await chrome.storage.local.set({
+    replayStatus: {
+      started: Boolean(replayStart?.ok && replayStart?.recording),
+      startError: replayStart?.error || null,
+      lastBatchAt: null,
+      lastBatchSize: 0,
+      storageError: null
+    }
+  });
   if (recordingMode === "allTabs") {
-    ensureRecordersForOpenTabs(tab.id).catch(() => {});
+    ensureRecordersForOpenTabs(tab.id).catch(() => { });
   }
 
   return { ok: true, recordingState };
@@ -138,9 +166,20 @@ async function stopRecording() {
   }
 
   const stoppedAt = Date.now();
-  await writeQueue.catch(() => {});
-  const stored = await chrome.storage.local.get(["recordingState", "eventBuffersByTab"]);
+  await sendTabMessage(recordingState.rootTabId, { action: "stopSessionReplay" });
+  await wait(150);
+  await writeQueue.catch(() => { });
+  const stored = await chrome.storage.local.get([
+    "recordingState",
+    "eventBuffer",
+    "eventBuffersByTab",
+    "replayEvents",
+    "replayStatus"
+  ]);
   recordingState = stored.recordingState || recordingState;
+  const eventBuffer = stored.eventBuffer || [];
+  const replayEvents = Array.isArray(stored.replayEvents) ? stored.replayEvents : [];
+  const replayStatus = stored.replayStatus || null;
   const eventBuffersByTab = stored.eventBuffersByTab || {};
 
   await chrome.storage.local.set({
@@ -182,6 +221,9 @@ async function stopRecording() {
     startedAt: recordingState.startedAt,
     stoppedAt,
     durationSeconds: Math.max(0, Math.round((stoppedAt - recordingState.startedAt) / 1000)),
+    events: Array.isArray(eventBuffer) ? eventBuffer : [],
+    replayEventCount: replayEvents.length,
+    replayStatus,
     tabs,
     screenshotBase64: captureResult.dataUrl,
     screenshotError: captureResult.error,
@@ -193,6 +235,14 @@ async function stopRecording() {
   });
 
   return { ok: true, report };
+}
+
+async function getReplayEvents() {
+  const { replayEvents = [] } = await chrome.storage.local.get("replayEvents");
+  return {
+    ok: true,
+    replayEvents: Array.isArray(replayEvents) ? replayEvents : []
+  };
 }
 
 async function getStatus() {
@@ -209,23 +259,34 @@ async function getStatus() {
 }
 
 async function ensureContentScripts(tabId) {
-  if (await pingContentScript(tabId)) return true;
+  const contentReady = await pingContentScript(tabId);
+  const replayReady = await pingReplayScript(tabId);
+  if (contentReady && replayReady) return true;
 
   try {
-    await chrome.scripting.executeScript({
-      target: { tabId },
-      files: ["injected.js"],
-      world: "MAIN"
-    });
-    await chrome.scripting.executeScript({
-      target: { tabId },
-      files: ["content.js"]
-    });
+    if (!contentReady) {
+      await chrome.scripting.executeScript({
+        target: { tabId },
+        files: ["injected.js"],
+        world: "MAIN"
+      });
+      await chrome.scripting.executeScript({
+        target: { tabId },
+        files: ["content.js"]
+      });
+    }
+
+    if (!replayReady) {
+      await chrome.scripting.executeScript({
+        target: { tabId },
+        files: ["vendor/rrweb.min.js", "session-recorder.js"]
+      });
+    }
   } catch {
     return false;
   }
 
-  return pingContentScript(tabId);
+  return (await pingContentScript(tabId)) && (await pingReplayScript(tabId));
 }
 
 async function ensureRecordersForOpenTabs(rootTabId) {
@@ -245,6 +306,18 @@ function pingContentScript(tabId) {
         return;
       }
       resolve(Boolean(response?.ok));
+    });
+  });
+}
+
+function pingReplayScript(tabId) {
+  return new Promise((resolve) => {
+    chrome.tabs.sendMessage(tabId, { action: "bugBlackBoxReplayPing" }, (response) => {
+      if (chrome.runtime.lastError) {
+        resolve(false);
+        return;
+      }
+      resolve(Boolean(response?.ok && response?.hasRrweb));
     });
   });
 }
@@ -290,7 +363,12 @@ function recordNetworkError(event, tabId) {
 }
 
 function enqueueAppendEvent(rawEvent, tabId) {
-  writeQueue = writeQueue.catch(() => {}).then(() => appendEvent(rawEvent, tabId));
+  writeQueue = writeQueue.catch(() => { }).then(() => appendEvent(rawEvent, tabId));
+  return writeQueue;
+}
+
+function enqueueAppendReplayEvents(events, tabId) {
+  writeQueue = writeQueue.catch(() => { }).then(() => appendReplayEvents(events, tabId));
   return writeQueue;
 }
 
@@ -399,6 +477,75 @@ function getBufferedEvents(eventBuffersByTab) {
   return Object.values(eventBuffersByTab || {}).flatMap((events) =>
     Array.isArray(events) ? events : []
   );
+}
+
+async function appendReplayEvents(events, tabId) {
+  if (!Array.isArray(events) || !events.length) return;
+
+  const { recordingState, replayEvents = [] } = await chrome.storage.local.get([
+    "recordingState",
+    "replayEvents"
+  ]);
+
+  if (!recordingState?.isRecording) return;
+  if (recordingState.rootTabId !== tabId) return;
+
+  const nextReplayEvents = Array.isArray(replayEvents)
+    ? [...replayEvents, ...events].slice(-MAX_REPLAY_EVENTS)
+    : events.slice(-MAX_REPLAY_EVENTS);
+
+  const storageResult = await setReplayEventsWithFallback(nextReplayEvents);
+  await chrome.storage.local.set({
+    replayStatus: {
+      ...(await getReplayStatus()),
+      lastBatchAt: Date.now(),
+      lastBatchSize: events.length,
+      storageError: storageResult.ok ? null : storageResult.error
+    }
+  });
+}
+
+function sendTabMessage(tabId, message) {
+  return chrome.tabs.sendMessage(tabId, message).catch(() => null);
+}
+
+async function setReplayEventsWithFallback(events) {
+  let nextEvents = events;
+
+  while (nextEvents.length) {
+    try {
+      await chrome.storage.local.set({ replayEvents: nextEvents });
+      return { ok: true };
+    } catch (error) {
+      if (nextEvents.length < MIN_REPLAY_EVENTS) {
+        return {
+          ok: false,
+          error: error.message || "REPLAY_STORAGE_QUOTA"
+        };
+      }
+      nextEvents = nextEvents.slice(Math.floor(nextEvents.length / 2));
+    }
+  }
+
+  await chrome.storage.local.set({ replayEvents: [] });
+  return { ok: true };
+}
+
+async function getReplayStatus() {
+  const { replayStatus } = await chrome.storage.local.get("replayStatus");
+  return replayStatus || {
+    started: false,
+    startError: null,
+    lastBatchAt: null,
+    lastBatchSize: 0,
+    storageError: null
+  };
+}
+
+function wait(milliseconds) {
+  return new Promise((resolve) => {
+    setTimeout(resolve, milliseconds);
+  });
 }
 
 function sanitizeEvent(rawEvent) {

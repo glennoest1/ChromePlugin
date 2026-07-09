@@ -9,7 +9,8 @@
     "activeTab",
     "tabs",
     "scripting",
-    "webRequest"
+    "webRequest",
+    "unlimitedStorage"
   ],
   "host_permissions": [
     "<all_urls>",
@@ -37,6 +38,11 @@
     {
       "matches": ["<all_urls>"],
       "js": ["content.js"],
+      "run_at": "document_start"
+    },
+    {
+      "matches": ["<all_urls>"],
+      "js": ["vendor/rrweb.min.js", "session-recorder.js"],
       "run_at": "document_start"
     }
   ],
