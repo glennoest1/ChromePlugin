@@ -15,14 +15,14 @@ Before inspecting or editing source files:
 
 1. Read `docs/README.md`.
 2. Read the docs file most relevant to the requested task:
-   - product behavior: `docs/product-spec.md`
-   - architecture or permissions: `docs/tech-architecture.md`
-   - storage/report shape: `docs/data-model.md`
-   - UI states: `docs/ui-spec.md`
-   - user journeys: `docs/user-flows.md`
-   - privacy/security: `docs/privacy-security.md`
-   - tests/demo behavior: `docs/testing-and-demo.md`
-   - requirements IDs: `docs/functional-requirements.md`
+   - [storage/report shape](../../docs/data-model.md)
+   - [requirements IDs](../../docs/functional-requirements.md)
+   - [privacy/security](../../docs/privacy-security.md)
+   - [product behavior](../../docs/product-spec.md)
+   - [architecture or permissions](../../docs/tech-architecture.md)
+   - [tests/demo behavior](../../docs/testing-and-demo.md)
+   - [UI states](../../docs/ui-spec.md)
+   - [user journeys](../../docs/user-flows.md)
 3. Only then inspect source under `bug-black-box/` or `test-page.html`.
 4. If docs and source disagree, state the mismatch before changing code.
 
@@ -100,3 +100,12 @@ Use this only when a source edit does not affect documented behavior:
 ```sh
 bash .github/hooks/scripts/docs-update-required.sh --acknowledge-no-docs
 ```
+
+## Auto-Synchronization
+
+To ensure that file listings under `Required Start Sequence` and `Hook Locations` remain up-to-date as the codebase evolves, run the following sync script:
+
+```sh
+node .skill/docs-first-workflow/update-skill.js
+```
+
