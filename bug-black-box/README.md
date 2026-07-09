@@ -102,10 +102,9 @@ The extension does not capture:
 - `contenteditable` content.
 - Cookies.
 - localStorage/sessionStorage dumps.
-- Request bodies.
-- Response bodies.
+- Full unbounded request or response bodies.
 
-Click and submit events store action metadata only. Network logging stores only method, sanitized URL, status code, and browser network error text.
+Click and submit events store action metadata only. Network logging stores important fetch/XHR request and response metadata: method, sanitized URL, redacted headers, truncated redacted bodies, status code, duration, and browser network error text.
 
 Sensitive URL query parameters are redacted when their names include:
 
@@ -146,7 +145,7 @@ popup.js
 - **Testing file:// fails**: enable **Allow access to file URLs** for Bug Black Box and reload the file tab.
 - **Console logs missing**: reload the target tab after reloading the extension.
 - **AI Explain says missing key**: save a Gemini API key in Settings.
-- **Network errors missing**: only failed requests in the currently recorded tab are saved.
+- **Network requests missing**: fetch/XHR requests are captured from recorded tabs; browser/static asset requests may only appear when Chrome reports them as failures.
 
 ## Recording Modes
 
@@ -155,6 +154,6 @@ The popup supports two recording modes before Start:
 - **Current tab** records only the tab where recording starts.
 - **All tabs** records events from multiple recordable tabs in the same session.
 
-Reports now use contract v2 and group events by `tabs[]`. Each tab entry includes `tabId`, `url`, `title`, and `events`. The screenshot is still captured only from the root tab. See `.task/samples/phase-1-report-v2.sample.json` for the shared sample payload.
+Reports now use contract v3 and group events by `tabs[]`. Each event includes `tabId` and `relativeTime`; actions include `eventId`; network and console events may include `triggeredByActionId`; tab metadata includes `activeRanges`; and `globalTimeline[]` provides chronological cross-tab references. The screenshot is still captured only from the root tab. See `.task/samples/phase-1-report-v3.sample.json` for the shared sample payload.
 
 In all-tabs mode, event limits are enforced per tab. Reset clears both the old `eventBuffer` compatibility key and the new `eventBuffersByTab` storage.

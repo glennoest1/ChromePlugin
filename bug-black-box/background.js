@@ -1,7 +1,15 @@
 const MAX_EVENTS = 500;
 const MAX_REPLAY_EVENTS = 5000;
 const MIN_REPLAY_EVENTS = 25;
+const REPORT_VERSION = 3;
+const ACTION_CORRELATION_WINDOW_MS = 500;
+const SPAM_WINDOW_MS = 1000;
+const MAX_CAPTURED_BODY_LENGTH = 2000;
+const MAX_CAPTURED_HEADER_LENGTH = 500;
 const RECORDING_MODES = new Set(["activeTab", "allTabs"]);
+const ACTION_EVENT_TYPES = new Set(["click", "submit"]);
+const CORRELATABLE_EVENT_TYPES = new Set(["console", "network", "networkError"]);
+const SENSITIVE_FIELD_PATTERN = /password|token|secret|authorization|cookie|api[-_]?key|session|set-cookie/i;
 const GEMINI_MODEL = "gemini-3.1-flash-lite"; // use this models bc it have most request per days
 const GEMINI_ENDPOINT = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`;
 const AI_PROMPT_FIELD_LIMIT = 3000;
@@ -17,6 +25,14 @@ chrome.runtime.onInstalled.addListener(() => {
     }
     return undefined;
   });
+});
+
+chrome.tabs.onActivated.addListener((activeInfo) => {
+  recordTabActivation(activeInfo).catch(() => { });
+});
+
+chrome.windows.onFocusChanged.addListener((windowId) => {
+  recordWindowFocusChange(windowId).catch(() => { });
 });
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
@@ -55,6 +71,67 @@ chrome.webRequest.onErrorOccurred.addListener((details) => {
   }, details.tabId);
 }, { urls: ["<all_urls>"] });
 
+async function recordTabActivation(activeInfo) {
+  const { recordingState } = await chrome.storage.local.get("recordingState");
+  if (!recordingState?.isRecording) return;
+
+  const timestamp = Date.now();
+  const windowId = activeInfo.windowId;
+  const previousTabId = recordingState.focusedTabsByWindow?.[String(windowId)];
+  if (Number.isFinite(previousTabId) && previousTabId !== activeInfo.tabId) {
+    await enqueueAppendEvent({
+      type: "tabBlur",
+      windowId,
+      timestamp
+    }, previousTabId);
+  }
+
+  if (normalizeRecordingMode(recordingState.mode) === "allTabs") {
+    ensureContentScripts(activeInfo.tabId).catch(() => { });
+  }
+
+  await enqueueAppendEvent({
+    type: "tabFocus",
+    windowId,
+    timestamp
+  }, activeInfo.tabId);
+}
+
+async function recordWindowFocusChange(windowId) {
+  const { recordingState } = await chrome.storage.local.get("recordingState");
+  if (!recordingState?.isRecording) return;
+
+  const timestamp = Date.now();
+  if (windowId === chrome.windows.WINDOW_ID_NONE) {
+    await Promise.all(Object.entries(recordingState.focusedTabsByWindow || {}).map(([focusedWindowId, tabId]) =>
+      enqueueAppendEvent({
+        type: "tabBlur",
+        windowId: Number(focusedWindowId),
+        timestamp
+      }, tabId)
+    ));
+    return;
+  }
+
+  const [activeTab] = await chrome.tabs.query({ active: true, windowId });
+  if (!activeTab?.id) return;
+
+  const previousTabId = recordingState.focusedTabsByWindow?.[String(windowId)];
+  if (Number.isFinite(previousTabId) && previousTabId !== activeTab.id) {
+    await enqueueAppendEvent({
+      type: "tabBlur",
+      windowId,
+      timestamp
+    }, previousTabId);
+  }
+
+  await enqueueAppendEvent({
+    type: "tabFocus",
+    windowId,
+    timestamp
+  }, activeTab.id);
+}
+
 async function runMessageHandler(message, sender) {
   switch (message.action) {
     case "startRecording":
@@ -80,6 +157,7 @@ async function runMessageHandler(message, sender) {
         replayEvents: [],
         replayStatus: null,
         eventBuffersByTab: {},
+        focusedTabsByWindow: {},
         lastReport: null
       });
       return { ok: true };
@@ -118,14 +196,26 @@ async function startRecording(mode = "activeTab") {
     mode: recordingMode,
     startedAt: now,
     rootTabId: tab.id,
+    nextActionSeq: 0,
+    focusedTabsByWindow: {
+      [String(tab.windowId)]: tab.id
+    },
     tabs: {
-      [tabKey]: buildTabMetadata(tab, now)
+      [tabKey]: buildTabMetadata(tab, now, {
+        isFocused: true,
+        focusedAt: now
+      })
     }
   };
+  const initialFocusEvent = buildBaseEvent({
+    type: "tabFocus",
+    windowId: tab.windowId,
+    timestamp: now
+  }, tab.id, recordingState);
 
   await chrome.storage.local.set({
     recordingState,
-    eventBuffer: [],
+    eventBuffer: [initialFocusEvent],
     replayEvents: [],
     replayStatus: {
       started: false,
@@ -135,7 +225,7 @@ async function startRecording(mode = "activeTab") {
       storageError: null
     },
     eventBuffersByTab: {
-      [tabKey]: []
+      [tabKey]: [initialFocusEvent]
     },
     lastReport: null
   });
@@ -180,7 +270,13 @@ async function stopRecording() {
   const eventBuffer = stored.eventBuffer || [];
   const replayEvents = Array.isArray(stored.replayEvents) ? stored.replayEvents : [];
   const replayStatus = stored.replayStatus || null;
-  const eventBuffersByTab = stored.eventBuffersByTab || {};
+  const finalized = finalizeRecordingSnapshot(
+    recordingState,
+    stored.eventBuffersByTab || {},
+    stoppedAt
+  );
+  recordingState = finalized.recordingState;
+  const eventBuffersByTab = finalized.eventBuffersByTab;
 
   await chrome.storage.local.set({
     recordingState: {
@@ -190,39 +286,22 @@ async function stopRecording() {
     }
   });
 
-  let recordedTab = null;
-  let captureResult = { dataUrl: null, error: null };
-
-  try {
-    recordedTab = await chrome.tabs.get(recordingState.rootTabId);
-    if (recordedTab?.id && recordedTab.windowId !== undefined) {
-      const [activeTab] = await chrome.tabs.query({
-        active: true,
-        windowId: recordedTab.windowId
-      });
-      if (activeTab?.id === recordedTab.id) {
-        captureResult = await captureVisibleTab(recordedTab.windowId);
-      } else {
-        captureResult = {
-          dataUrl: null,
-          error: "Root tab is not active; screenshot skipped."
-        };
-      }
-    }
-  } catch (error) {
-    captureResult = { dataUrl: null, error: error.message || "Capture failed" };
-  }
+  const captureResult = await captureRootTabScreenshot(recordingState.rootTabId);
 
   const tabs = await buildReportTabs(recordingState, eventBuffersByTab);
+  const flattenedEvents = flattenTabEvents(tabs);
+  const replayEventsWithRelativeTime = addRelativeTimeToReplayEvents(replayEvents, recordingState.startedAt);
   const report = {
-    version: 2,
+    version: REPORT_VERSION,
     mode: normalizeRecordingMode(recordingState.mode),
     rootTabId: recordingState.rootTabId,
     startedAt: recordingState.startedAt,
     stoppedAt,
     durationSeconds: Math.max(0, Math.round((stoppedAt - recordingState.startedAt) / 1000)),
-    events: Array.isArray(eventBuffer) ? eventBuffer : [],
-    replayEventCount: replayEvents.length,
+    events: flattenedEvents.length ? flattenedEvents : (Array.isArray(eventBuffer) ? eventBuffer : []),
+    globalTimeline: buildGlobalTimeline(tabs),
+    replayEvents: replayEventsWithRelativeTime,
+    replayEventCount: replayEventsWithRelativeTime.length,
     replayStatus,
     tabs,
     screenshotBase64: captureResult.dataUrl,
@@ -350,6 +429,37 @@ function captureVisibleTab(windowId) {
   });
 }
 
+async function captureRootTabScreenshot(rootTabId) {
+  try {
+    const rootTab = await chrome.tabs.get(rootTabId);
+    if (!rootTab?.id || rootTab.windowId === undefined) {
+      return { dataUrl: null, error: "Root tab is no longer available." };
+    }
+
+    const [previousActiveTab] = await chrome.tabs.query({
+      active: true,
+      windowId: rootTab.windowId
+    });
+    const shouldRestoreActiveTab = previousActiveTab?.id &&
+      previousActiveTab.id !== rootTab.id;
+
+    if (shouldRestoreActiveTab) {
+      await chrome.tabs.update(rootTab.id, { active: true });
+      await wait(120);
+    }
+
+    const captureResult = await captureVisibleTab(rootTab.windowId);
+
+    if (shouldRestoreActiveTab) {
+      chrome.tabs.update(previousActiveTab.id, { active: true }).catch(() => { });
+    }
+
+    return captureResult;
+  } catch (error) {
+    return { dataUrl: null, error: error.message || "Capture failed" };
+  }
+}
+
 function recordNetworkError(event, tabId) {
   if (typeof tabId !== "number" || tabId < 0) return;
   enqueueAppendEvent({
@@ -373,9 +483,6 @@ function enqueueAppendReplayEvents(events, tabId) {
 }
 
 async function appendEvent(rawEvent, tabId) {
-  const event = sanitizeEvent(rawEvent);
-  if (!event) return;
-
   const { recordingState, eventBuffersByTab = {} } = await chrome.storage.local.get([
     "recordingState",
     "eventBuffersByTab"
@@ -384,21 +491,29 @@ async function appendEvent(rawEvent, tabId) {
   if (!recordingState?.isRecording) return;
   if (!shouldRecordTab(recordingState, tabId)) return;
 
-  const nextState = await ensureRecordedTab(recordingState, tabId);
-  if (!nextState) return;
+  const stateWithTab = await ensureRecordedTab(recordingState, tabId);
+  if (!stateWithTab) return;
 
   const tabKey = String(tabId);
   const currentBuffer = Array.isArray(eventBuffersByTab[tabKey])
     ? eventBuffersByTab[tabKey]
     : [];
+  const prepared = prepareEvent(rawEvent, tabId, stateWithTab, currentBuffer);
+  if (!prepared) return;
+
+  const nextState = applyEventToRecordingState(prepared.recordingState, prepared.event);
   const nextBuffers = {
     ...eventBuffersByTab,
-    [tabKey]: [...currentBuffer, event].slice(-MAX_EVENTS)
+    [tabKey]: [...currentBuffer, prepared.event].slice(-MAX_EVENTS)
   };
+  const flatEvents = getBufferedEvents(nextBuffers)
+    .sort((a, b) => normalizeTimestamp(a.timestamp) - normalizeTimestamp(b.timestamp))
+    .slice(-MAX_EVENTS);
 
   await chrome.storage.local.set({
     recordingState: nextState,
-    eventBuffersByTab: nextBuffers
+    eventBuffersByTab: nextBuffers,
+    eventBuffer: flatEvents
   });
 }
 
@@ -439,12 +554,21 @@ async function buildReportTabs(recordingState, eventBuffersByTab) {
   const tabs = await Promise.all(Array.from(tabKeys).map(async (tabKey) => {
     const storedTab = tabsById[tabKey] || { tabId: Number(tabKey), url: "", title: "" };
     const liveTab = await getTabOrNull(storedTab.tabId);
-    const metadata = liveTab ? buildTabMetadata(liveTab, storedTab.startedAt) : storedTab;
+    const metadata = liveTab
+      ? {
+        ...storedTab,
+        url: sanitizeUrl(liveTab.url || storedTab.url || ""),
+        title: liveTab.title || storedTab.title || "",
+        windowId: numberOrNull(liveTab.windowId)
+      }
+      : storedTab;
 
     return {
       tabId: metadata.tabId,
       url: metadata.url || "",
       title: metadata.title || "",
+      startedAt: metadata.startedAt || recordingState.startedAt,
+      activeRanges: normalizeActiveRanges(metadata.activeRanges),
       events: Array.isArray(eventBuffersByTab?.[tabKey]) ? eventBuffersByTab[tabKey] : []
     };
   }));
@@ -456,12 +580,16 @@ async function buildReportTabs(recordingState, eventBuffersByTab) {
   });
 }
 
-function buildTabMetadata(tab, startedAt) {
+function buildTabMetadata(tab, startedAt, focus = {}) {
+  const focusedAt = Number.isFinite(focus.focusedAt) ? focus.focusedAt : null;
   return {
     tabId: tab.id,
     url: sanitizeUrl(tab.url || ""),
     title: tab.title || "",
-    startedAt
+    windowId: numberOrNull(tab.windowId),
+    startedAt,
+    isFocused: Boolean(focus.isFocused),
+    activeRanges: focusedAt ? [{ focusedAt, blurredAt: null }] : []
   };
 }
 
@@ -490,16 +618,17 @@ async function appendReplayEvents(events, tabId) {
   if (!recordingState?.isRecording) return;
   if (recordingState.rootTabId !== tabId) return;
 
+  const normalizedEvents = addRelativeTimeToReplayEvents(events, recordingState.startedAt);
   const nextReplayEvents = Array.isArray(replayEvents)
-    ? [...replayEvents, ...events].slice(-MAX_REPLAY_EVENTS)
-    : events.slice(-MAX_REPLAY_EVENTS);
+    ? [...replayEvents, ...normalizedEvents].slice(-MAX_REPLAY_EVENTS)
+    : normalizedEvents.slice(-MAX_REPLAY_EVENTS);
 
   const storageResult = await setReplayEventsWithFallback(nextReplayEvents);
   await chrome.storage.local.set({
     replayStatus: {
       ...(await getReplayStatus()),
       lastBatchAt: Date.now(),
-      lastBatchSize: events.length,
+      lastBatchSize: normalizedEvents.length,
       storageError: storageResult.ok ? null : storageResult.error
     }
   });
@@ -555,6 +684,14 @@ function sanitizeEvent(rawEvent) {
     ? rawEvent.timestamp
     : Date.now();
 
+  if (rawEvent.type === "tabFocus" || rawEvent.type === "tabBlur") {
+    return {
+      type: rawEvent.type,
+      windowId: numberOrNull(rawEvent.windowId),
+      timestamp
+    };
+  }
+
   if (rawEvent.type === "console") {
     const allowedLevel = ["log", "warn", "error"].includes(rawEvent.level)
       ? rawEvent.level
@@ -588,18 +725,282 @@ function sanitizeEvent(rawEvent) {
     };
   }
 
+  if (rawEvent.type === "network") {
+    return {
+      type: "network",
+      source: stringifyValue(rawEvent.source || ""),
+      method: stringifyValue(rawEvent.method || "GET").toUpperCase(),
+      url: sanitizeUrl(rawEvent.url || ""),
+      requestHeaders: sanitizeHeaders(rawEvent.requestHeaders),
+      requestBody: sanitizePayload(rawEvent.requestBody),
+      responseHeaders: sanitizeHeaders(rawEvent.responseHeaders),
+      responseBody: sanitizePayload(rawEvent.responseBody),
+      statusCode: numberOrNull(rawEvent.statusCode),
+      durationMs: numberOrNull(rawEvent.durationMs),
+      error: stringifyValue(rawEvent.error || ""),
+      timestamp
+    };
+  }
+
   if (rawEvent.type === "networkError") {
     return {
       type: "networkError",
       method: stringifyValue(rawEvent.method || "GET"),
       url: sanitizeUrl(rawEvent.url || ""),
+      requestHeaders: sanitizeHeaders(rawEvent.requestHeaders),
+      requestBody: sanitizePayload(rawEvent.requestBody),
+      responseHeaders: sanitizeHeaders(rawEvent.responseHeaders),
+      responseBody: sanitizePayload(rawEvent.responseBody),
       statusCode: numberOrNull(rawEvent.statusCode),
+      durationMs: numberOrNull(rawEvent.durationMs),
       error: stringifyValue(rawEvent.error || ""),
       timestamp
     };
   }
 
   return null;
+}
+
+function prepareEvent(rawEvent, tabId, recordingState, currentBuffer) {
+  const sanitizedEvent = sanitizeEvent(rawEvent);
+  if (!sanitizedEvent) return null;
+
+  let nextState = recordingState;
+  const event = buildBaseEvent(sanitizedEvent, tabId, recordingState);
+
+  if (ACTION_EVENT_TYPES.has(event.type)) {
+    const actionSeq = Number(recordingState.nextActionSeq || 0) + 1;
+    event.eventId = stringifyValue(rawEvent.eventId || `action-${recordingState.startedAt}-${actionSeq}`);
+    applySpamMetadata(event, currentBuffer);
+    nextState = {
+      ...recordingState,
+      nextActionSeq: actionSeq
+    };
+  }
+
+  if (CORRELATABLE_EVENT_TYPES.has(event.type)) {
+    const action = findRecentAction(currentBuffer, event.timestamp);
+    if (action?.eventId) event.triggeredByActionId = action.eventId;
+  }
+
+  return {
+    event,
+    recordingState: nextState
+  };
+}
+
+function buildBaseEvent(event, tabId, recordingState) {
+  const timestamp = normalizeTimestamp(event.timestamp);
+  return {
+    ...event,
+    tabId,
+    timestamp,
+    relativeTime: getRelativeTime(timestamp, recordingState.startedAt)
+  };
+}
+
+function applySpamMetadata(event, currentBuffer) {
+  if (!event.selector) return;
+
+  let spamCount = 1;
+  for (let index = currentBuffer.length - 1; index >= 0; index -= 1) {
+    const previousEvent = currentBuffer[index];
+    if (!ACTION_EVENT_TYPES.has(previousEvent?.type)) continue;
+    if (event.timestamp - normalizeTimestamp(previousEvent.timestamp) > SPAM_WINDOW_MS) break;
+    if (previousEvent.selector !== event.selector) break;
+    spamCount += 1;
+  }
+
+  if (spamCount >= 3) {
+    event.isSpam = true;
+    event.spamCount = spamCount;
+  }
+}
+
+function findRecentAction(events, timestamp) {
+  for (let index = events.length - 1; index >= 0; index -= 1) {
+    const event = events[index];
+    if (!ACTION_EVENT_TYPES.has(event?.type)) continue;
+    const elapsed = timestamp - normalizeTimestamp(event.timestamp);
+    if (elapsed < 0) continue;
+    if (elapsed <= ACTION_CORRELATION_WINDOW_MS) return event;
+    return null;
+  }
+  return null;
+}
+
+function applyEventToRecordingState(recordingState, event) {
+  if (event.type !== "tabFocus" && event.type !== "tabBlur") return recordingState;
+
+  const tabKey = String(event.tabId);
+  const tab = recordingState.tabs?.[tabKey];
+  if (!tab) return recordingState;
+  const windowId = Number.isFinite(event.windowId) ? event.windowId : tab.windowId;
+  const focusedTabsByWindow = updateFocusedTabsByWindow(
+    recordingState.focusedTabsByWindow,
+    event.type,
+    windowId,
+    event.tabId
+  );
+
+  return {
+    ...recordingState,
+    focusedTabsByWindow,
+    tabs: {
+      ...(recordingState.tabs || {}),
+      [tabKey]: event.type === "tabFocus"
+        ? markTabFocused(tab, event.timestamp)
+        : markTabBlurred(tab, event.timestamp)
+    }
+  };
+}
+
+function updateFocusedTabsByWindow(currentFocusedTabs, eventType, windowId, tabId) {
+  if (!Number.isFinite(windowId)) return currentFocusedTabs || {};
+
+  const windowKey = String(windowId);
+  const nextFocusedTabs = { ...(currentFocusedTabs || {}) };
+  if (eventType === "tabFocus") {
+    nextFocusedTabs[windowKey] = tabId;
+  } else if (nextFocusedTabs[windowKey] === tabId) {
+    delete nextFocusedTabs[windowKey];
+  }
+  return nextFocusedTabs;
+}
+
+function markTabFocused(tab, timestamp) {
+  if (tab.isFocused) return tab;
+
+  return {
+    ...tab,
+    isFocused: true,
+    activeRanges: [
+      ...normalizeActiveRanges(tab.activeRanges),
+      { focusedAt: timestamp, blurredAt: null }
+    ]
+  };
+}
+
+function markTabBlurred(tab, timestamp) {
+  if (!tab.isFocused) return tab;
+
+  const activeRanges = normalizeActiveRanges(tab.activeRanges);
+  const rangeIndex = activeRanges.length - 1;
+  const nextRanges = rangeIndex >= 0
+    ? activeRanges.map((range, index) => index === rangeIndex && range.blurredAt === null
+      ? { ...range, blurredAt: timestamp }
+      : range)
+    : [{ focusedAt: tab.startedAt || timestamp, blurredAt: timestamp }];
+
+  return {
+    ...tab,
+    isFocused: false,
+    activeRanges: nextRanges
+  };
+}
+
+function normalizeActiveRanges(ranges) {
+  return (Array.isArray(ranges) ? ranges : [])
+    .map((range) => ({
+      focusedAt: numberOrNull(range?.focusedAt),
+      blurredAt: numberOrNull(range?.blurredAt)
+    }))
+    .filter((range) => Number.isFinite(range.focusedAt));
+}
+
+function finalizeRecordingSnapshot(recordingState, eventBuffersByTab, stoppedAt) {
+  let nextState = recordingState;
+  let nextBuffers = eventBuffersByTab || {};
+
+  for (const tab of Object.values(recordingState.tabs || {})) {
+    if (!tab?.isFocused) continue;
+    const blurEvent = buildBaseEvent({
+      type: "tabBlur",
+      windowId: tab.windowId,
+      timestamp: stoppedAt
+    }, tab.tabId, recordingState);
+    nextState = applyEventToRecordingState(nextState, blurEvent);
+    const tabKey = String(tab.tabId);
+    const currentBuffer = Array.isArray(nextBuffers[tabKey]) ? nextBuffers[tabKey] : [];
+    nextBuffers = {
+      ...nextBuffers,
+      [tabKey]: [...currentBuffer, blurEvent].slice(-MAX_EVENTS)
+    };
+  }
+
+  return {
+    recordingState: nextState,
+    eventBuffersByTab: nextBuffers
+  };
+}
+
+function flattenTabEvents(tabs) {
+  return (Array.isArray(tabs) ? tabs : [])
+    .flatMap((tab) => (Array.isArray(tab.events) ? tab.events : []))
+    .sort((a, b) => normalizeTimestamp(a.timestamp) - normalizeTimestamp(b.timestamp));
+}
+
+function buildGlobalTimeline(tabs) {
+  return (Array.isArray(tabs) ? tabs : [])
+    .flatMap((tab) => (Array.isArray(tab.events) ? tab.events : [])
+      .map((event, eventIndex) => ({
+        timestamp: normalizeTimestamp(event.timestamp),
+        relativeTime: numberOrNull(event.relativeTime),
+        tabId: tab.tabId,
+        eventIndex
+      })))
+    .sort((a, b) => a.timestamp - b.timestamp);
+}
+
+function addRelativeTimeToReplayEvents(events, startedAt) {
+  return (Array.isArray(events) ? events : [])
+    .filter((event) => event && typeof event === "object")
+    .map((event) => {
+      const timestamp = normalizeTimestamp(event.timestamp);
+      return {
+        ...event,
+        timestamp,
+        relativeTime: getRelativeTime(timestamp, startedAt)
+      };
+    });
+}
+
+function getRelativeTime(timestamp, startedAt) {
+  return Math.max(0, normalizeTimestamp(timestamp) - normalizeTimestamp(startedAt));
+}
+
+function normalizeTimestamp(value) {
+  return Number.isFinite(Number(value)) ? Number(value) : Date.now();
+}
+
+function sanitizeHeaders(headers) {
+  if (!headers || typeof headers !== "object") return {};
+
+  return Object.entries(headers).reduce((result, [key, value]) => {
+    const headerName = stringifyValue(key).toLowerCase();
+    if (!headerName) return result;
+    result[headerName] = SENSITIVE_FIELD_PATTERN.test(headerName)
+      ? "[redacted]"
+      : limitText(redactSensitiveText(stringifyValue(value)), MAX_CAPTURED_HEADER_LENGTH);
+    return result;
+  }, {});
+}
+
+function sanitizePayload(value) {
+  if (value === undefined || value === null || value === "") return "";
+  return limitText(redactSensitiveText(stringifyValue(value)), MAX_CAPTURED_BODY_LENGTH);
+}
+
+function redactSensitiveText(text) {
+  return String(text)
+    .replace(/((?:password|token|secret|authorization|cookie|api[-_]?key|session)\s*[:=]\s*)([^\s,;&]+)/gi, "$1[redacted]")
+    .replace(/(Bearer\s+)[A-Za-z0-9._~+/=-]+/gi, "$1[redacted]");
+}
+
+function limitText(value, maxLength) {
+  const text = stringifyValue(value);
+  if (text.length <= maxLength) return text;
+  return `${text.slice(0, maxLength)}...`;
 }
 
 function countEvents(events) {
@@ -609,6 +1010,7 @@ function countEvents(events) {
     jsError: 0,
     click: 0,
     submit: 0,
+    network: 0,
     networkError: 0
   };
 
@@ -707,8 +1109,8 @@ function buildExplainPrompt(report) {
     .join("\n");
 
   const networkErrors = events
-    .filter((event) => event.type === "networkError")
-    .map((event) => `- ${event.method} ${limitForAI(event.url)} ${event.statusCode ? "status " + event.statusCode : limitForAI(event.error)}`)
+    .filter((event) => event.type === "networkError" || (event.type === "network" && (event.error || Number(event.statusCode) >= 400)))
+    .map((event) => `- ${event.method} ${limitForAI(event.url)} ${event.statusCode ? "status " + event.statusCode : limitForAI(event.error)}${event.responseBody ? " response: " + limitForAI(event.responseBody) : ""}`)
     .join("\n");
 
   const steps = events
@@ -736,7 +1138,7 @@ Chỉ trả lời đoạn giải thích.`;
 }
 
 function getReportEvents(report) {
-  if (Array.isArray(report?.events)) return report.events;
+  if (Array.isArray(report?.events) && report.events.length) return report.events;
   return (report?.tabs || []).flatMap((tab) => Array.isArray(tab.events) ? tab.events : []);
 }
 

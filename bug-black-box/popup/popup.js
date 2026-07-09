@@ -94,7 +94,7 @@ function renderRecording(recordingState, counts = {}) {
         ${stat(counts.console || 0, "logs")}
         ${stat((counts.jsError || 0) + (counts.consoleError || 0), "errors")}
         ${stat((counts.click || 0) + (counts.submit || 0), "actions")}
-        ${stat(counts.networkError || 0, "network")}
+        ${stat((counts.network || 0) + (counts.networkError || 0), "network")}
       </div>
       <div id="recordingTabList">${mode === "allTabs" ? renderTabList(tabs) : ""}</div>
       <button class="button button-dark" id="stopButton">Stop & Create Report</button>
@@ -122,7 +122,7 @@ function updateStats(counts) {
   values[0].textContent = counts.console || 0;
   values[1].textContent = (counts.jsError || 0) + (counts.consoleError || 0);
   values[2].textContent = (counts.click || 0) + (counts.submit || 0);
-  values[3].textContent = counts.networkError || 0;
+  values[3].textContent = (counts.network || 0) + (counts.networkError || 0);
 }
 
 function renderReport(report, hasApiKey = false, aiMessage = "") {
@@ -135,7 +135,8 @@ function renderReport(report, hasApiKey = false, aiMessage = "") {
   const hasErrors = counts.jsError + counts.consoleError > 0;
   const steps = events.filter((event) => event.type === "click" || event.type === "submit");
   const jsErrors = events.filter((event) => event.type === "jsError");
-  const networkErrors = events.filter((event) => event.type === "networkError");
+  const networkEvents = events.filter((event) => event.type === "network" || event.type === "networkError");
+  const networkErrors = events.filter((event) => event.type === "networkError" || (event.type === "network" && (event.error || Number(event.statusCode) >= 400)));
   const showExplain = hasErrors;
   const replayEventCount = Number(report.replayEventCount || 0);
   const replayStatusText = getReplayStatusText(report);
@@ -155,7 +156,7 @@ function renderReport(report, hasApiKey = false, aiMessage = "") {
         <p><strong>Mode:</strong> ${escapeHtml(MODE_LABELS[normalizeMode(report.mode)] || "Current tab")}</p>
         <p><strong>Tabs:</strong> ${tabs.length}</p>
         <p><strong>Duration:</strong> ${report.durationSeconds || 0}s</p>
-        <p><strong>Captured:</strong> ${counts.console} logs, ${steps.length} actions, ${networkErrors.length} network errors</p>
+        <p><strong>Captured:</strong> ${counts.console} logs, ${steps.length} actions, ${networkEvents.length} network request(s)</p>
         <p><strong>Session replay:</strong> ${escapeHtml(replayStatusText)}</p>
       </div>
       ${report.screenshotBase64 ? `<img class="preview-image" src="${report.screenshotBase64}" alt="Captured screenshot">` : `<div class="notice">Screenshot unavailable${report.screenshotError ? `: ${escapeHtml(report.screenshotError)}` : ""}</div>`}
@@ -326,7 +327,8 @@ function buildMarkdown(report) {
   const steps = events.filter((event) => event.type === "click" || event.type === "submit");
   const errors = events.filter((event) => event.type === "jsError");
   const consoleEvents = events.filter((event) => event.type === "console");
-  const networkErrors = events.filter((event) => event.type === "networkError");
+  const networkEvents = events.filter((event) => event.type === "network" || event.type === "networkError");
+  const networkErrors = networkEvents.filter((event) => event.type === "networkError" || event.error || Number(event.statusCode) >= 400);
   const rootTab = tabs.find((tab) => tab.tabId === report.rootTabId) || tabs[0] || {};
   const title = rootTab.title || rootTab.url || report.tabTitle || report.tabUrl || "Unknown Page";
 
@@ -349,6 +351,9 @@ ${errors.length ? fenced(errors.map(formatError).join("\n\n")) : "(No JavaScript
 
 ## Network Errors
 ${networkErrors.length ? fenced(networkErrors.map(formatNetworkError).join("\n")) : "(No failed network requests captured.)"}
+
+## Network Requests
+${networkEvents.length ? fenced(networkEvents.map(formatNetworkRequest).join("\n\n")) : "(No network requests captured.)"}
 
 ## Console Log
 ${consoleEvents.length ? fenced(consoleEvents.map(formatConsoleEvent).join("\n")) : "(No console logs captured.)"}
@@ -382,7 +387,7 @@ function countEvents(events = []) {
       counts[event.type] += 1;
     }
     return counts;
-  }, { console: 0, consoleError: 0, jsError: 0, click: 0, submit: 0, networkError: 0 });
+  }, { console: 0, consoleError: 0, jsError: 0, click: 0, submit: 0, network: 0, networkError: 0 });
 }
 
 function getReportTabs(report) {
@@ -467,6 +472,15 @@ function formatNetworkError(event) {
 
 function formatNetworkErrorPreview(event) {
   return truncateForPreview(formatNetworkError(event));
+}
+
+function formatNetworkRequest(event) {
+  const status = event.statusCode ? `status ${event.statusCode}` : event.error || "pending/failed";
+  const duration = Number.isFinite(event.durationMs) ? ` in ${event.durationMs}ms` : "";
+  const action = event.triggeredByActionId ? `\nTriggered by: ${event.triggeredByActionId}` : "";
+  const requestBody = event.requestBody ? `\nRequest body: ${event.requestBody}` : "";
+  const responseBody = event.responseBody ? `\nResponse body: ${event.responseBody}` : "";
+  return `[${formatTime(event.timestamp)}] ${event.method || "GET"} ${event.url} - ${status}${duration}${action}${requestBody}${responseBody}`;
 }
 
 function formatConsoleEvent(event) {
