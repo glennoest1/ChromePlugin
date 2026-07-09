@@ -63,3 +63,31 @@ Strong success criteria let you loop independently. Weak criteria ("make it work
 ---
 
 **These guidelines are working if:** fewer unnecessary changes in diffs, fewer rewrites due to overcomplication, and clarifying questions come before implementation rather than after mistakes.
+
+## 5. Docs-First Project Workflow
+
+Before project work, read the local workflow skill:
+- `.skill/docs-first-workflow/SKILL.md`
+
+Before touching the codebase:
+- Read `docs/README.md` first.
+- Read the docs file(s) relevant to the requested work before inspecting or editing source files.
+- Use the docs as the project contract. If the docs and code disagree, identify the mismatch before changing code.
+
+While implementing:
+- Keep code changes scoped to the requested behavior.
+- Do not add features that are not represented in the request or existing docs.
+
+After source changes:
+- If a change adds, removes, or changes a feature, user flow, UI state, data model, permission, privacy behavior, report format, integration, or testing expectation, update the relevant file under `docs/` in the same work session.
+- If the source change does not affect documented behavior, explicitly acknowledge that no docs update is needed.
+
+GitHub Copilot cloud agent hooks enforce this workflow. Hook config follows GitHub's `version: 1` format in `.github/hooks/docs-first.json`, and all hook scripts are Bash scripts under `.github/hooks/scripts/`. See `.skill/docs-first-workflow/SKILL.md` and `.github/hooks/README.md` before changing hook behavior.
+
+- `.github/hooks/scripts/docs-first.sh` blocks source/codebase tools until `docs/` has been reviewed.
+- `.github/hooks/scripts/docs-update-required.sh` marks docs as needing review after source edits.
+- `.github/hooks/scripts/docs-stop-check.sh` blocks completion until docs are updated, or until a no-docs-needed source change is acknowledged with:
+
+```sh
+bash .github/hooks/scripts/docs-update-required.sh --acknowledge-no-docs
+```
