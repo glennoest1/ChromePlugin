@@ -36,6 +36,11 @@ After source changes, update `docs/` in the same session when the change adds, r
 
 If a source change does not affect documented behavior, explicitly acknowledge that no docs update is needed.
 
+### ⚠️ Strict Document Versioning Rule
+* **Do not edit, modify, or append** directly to any existing versioned document (e.g., `docs/ui/v1-ui-spec.md` must never be modified).
+* **Create a new file** in the same domain subdirectory with the version number incremented in the filename (e.g., write to a new file `docs/ui/v1.1-ui-spec.md` or `docs/ui/v1.2-ui-spec.md` depending on the update, since we are in Phase 1).
+* State the differences, additions, and deprecations compared to the previous version at the beginning of the new file.
+
 ## Hook Locations
 
 ```text
