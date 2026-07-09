@@ -13,18 +13,12 @@ Use this skill to work safely in the Bug Black Box repository. Treat `docs/` as 
 
 Before inspecting or editing source files:
 
-1. Read `docs/README.md`.
-2. Read the docs file most relevant to the requested task:
-   - [storage/report shape](../../docs/data-model.md)
-   - [requirements IDs](../../docs/functional-requirements.md)
-   - [privacy/security](../../docs/privacy-security.md)
-   - [product behavior](../../docs/product-spec.md)
-   - [architecture or permissions](../../docs/tech-architecture.md)
-   - [tests/demo behavior](../../docs/testing-and-demo.md)
-   - [UI states](../../docs/ui-spec.md)
-   - [user journeys](../../docs/user-flows.md)
-3. Only then inspect source under `bug-black-box/` or `test-page.html`.
-4. If docs and source disagree, state the mismatch before changing code.
+1. Read the root guide at `docs/README.md`.
+2. **Dynamically discover available documentation**: Run filesystem listing tools (e.g. `list_dir`) on the `docs/` folder recursively to locate available domain directories (e.g., `docs/product/`, `docs/architecture/`, `docs/data/`, `docs/ui/`, `docs/security/`, `docs/testing/`).
+3. **Select and read the most relevant files**: Identify the documents matching the domain of your task.
+   - *Strict Version Rule*: If multiple versioned files exist for a spec (e.g., `docs/ui/v1-ui-spec.md` and `docs/ui/v2-ui-spec.md`), you **must** select and read the file with the highest version prefix (e.g., `v2-ui-spec.md`).
+4. Only then inspect source under `bug-black-box/` or `test-page.html`.
+5. If docs and source disagree, state the mismatch before changing code.
 
 ## Implementation Rule
 
@@ -43,8 +37,6 @@ After source changes, update `docs/` in the same session when the change adds, r
 If a source change does not affect documented behavior, explicitly acknowledge that no docs update is needed.
 
 ## Hook Locations
-
-GitHub Copilot cloud agent hooks live here:
 
 ```text
 .github/hooks/docs-first.json
@@ -103,9 +95,8 @@ bash .github/hooks/scripts/docs-update-required.sh --acknowledge-no-docs
 
 ## Auto-Synchronization
 
-To ensure that file listings under `Required Start Sequence` and `Hook Locations` remain up-to-date as the codebase evolves, run the following sync script:
+To ensure that the file listings under `Hook Locations` remain up-to-date as the codebase evolves, run the sync script:
 
 ```sh
 node .skill/docs-first-workflow/update-skill.js
 ```
-
