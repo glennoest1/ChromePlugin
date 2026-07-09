@@ -8,6 +8,29 @@
   let stopReplayRecording = null;
   let replayBuffer = [];
   let flushTimer = null;
+  let replayArmed = false;
+
+  chrome.storage.local.get("recordingState").then(({ recordingState }) => {
+    replayArmed = shouldArmReplay(recordingState);
+  }).catch(() => {});
+
+  chrome.storage.onChanged.addListener((changes, areaName) => {
+    if (areaName !== "local" || !changes.recordingState) return;
+
+    replayArmed = shouldArmReplay(changes.recordingState.newValue);
+    if (!replayArmed && stopReplayRecording) {
+      stopSessionReplay();
+    }
+  });
+
+  document.addEventListener("pointerdown", () => {
+    if (!replayArmed || stopReplayRecording) return;
+
+    const result = startSessionReplay();
+    if (result.recording) {
+      replayArmed = false;
+    }
+  }, true);
 
   chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     if (message?.action === "bugBlackBoxReplayPing") {
@@ -63,6 +86,10 @@
     }
 
     return { ok: true, recording: Boolean(stopReplayRecording) };
+  }
+
+  function shouldArmReplay(recordingState) {
+    return Boolean(recordingState?.isRecording && recordingState.mode === "allTabs");
   }
 
   function stopSessionReplay() {
