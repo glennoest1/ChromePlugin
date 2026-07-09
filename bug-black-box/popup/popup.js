@@ -94,7 +94,7 @@ function renderRecording(recordingState, counts = {}) {
         ${stat(counts.console || 0, "logs")}
         ${stat((counts.jsError || 0) + (counts.consoleError || 0), "errors")}
         ${stat((counts.click || 0) + (counts.submit || 0), "actions")}
-        ${stat(counts.networkError || 0, "network")}
+        ${stat((counts.network || 0) + (counts.networkError || 0), "network")}
       </div>
       <div id="recordingTabList">${mode === "allTabs" ? renderTabList(tabs) : ""}</div>
       <button class="button button-dark" id="stopButton">Stop & Create Report</button>
@@ -122,7 +122,7 @@ function updateStats(counts) {
   values[0].textContent = counts.console || 0;
   values[1].textContent = (counts.jsError || 0) + (counts.consoleError || 0);
   values[2].textContent = (counts.click || 0) + (counts.submit || 0);
-  values[3].textContent = counts.networkError || 0;
+  values[3].textContent = (counts.network || 0) + (counts.networkError || 0);
 }
 
 function renderReport(report, hasApiKey = false, aiMessage = "") {
@@ -135,11 +135,13 @@ function renderReport(report, hasApiKey = false, aiMessage = "") {
   const hasErrors = counts.jsError + counts.consoleError > 0;
   const steps = events.filter((event) => event.type === "click" || event.type === "submit");
   const jsErrors = events.filter((event) => event.type === "jsError");
-  const networkErrors = events.filter((event) => event.type === "networkError");
+  const networkEvents = events.filter((event) => event.type === "network" || event.type === "networkError");
+  const networkErrors = events.filter((event) => event.type === "networkError" || (event.type === "network" && (event.error || Number(event.statusCode) >= 400)));
   const showExplain = hasErrors;
-  const replayEventCount = Number(report.replayEventCount || 0);
+  const replayEventCount = getTotalReplayEvents(report);
   const replayStatusText = getReplayStatusText(report);
   const rootTab = tabs.find((tab) => tab.tabId === report.rootTabId) || tabs[0] || {};
+  const screenshots = getReportScreenshots(report);
 
   app.innerHTML = `
     <section class="panel">
@@ -155,10 +157,10 @@ function renderReport(report, hasApiKey = false, aiMessage = "") {
         <p><strong>Mode:</strong> ${escapeHtml(MODE_LABELS[normalizeMode(report.mode)] || "Current tab")}</p>
         <p><strong>Tabs:</strong> ${tabs.length}</p>
         <p><strong>Duration:</strong> ${report.durationSeconds || 0}s</p>
-        <p><strong>Captured:</strong> ${counts.console} logs, ${steps.length} actions, ${networkErrors.length} network errors</p>
+        <p><strong>Captured:</strong> ${counts.console} logs, ${steps.length} actions, ${networkEvents.length} network request(s)</p>
         <p><strong>Session replay:</strong> ${escapeHtml(replayStatusText)}</p>
       </div>
-      ${report.screenshotBase64 ? `<img class="preview-image" src="${report.screenshotBase64}" alt="Captured screenshot">` : `<div class="notice">Screenshot unavailable${report.screenshotError ? `: ${escapeHtml(report.screenshotError)}` : ""}</div>`}
+      ${renderScreenshotPreview(report, screenshots)}
       ${tabs.length > 1 ? `<div class="section"><h3>Captured Tabs</h3>${renderTabList(tabs)}</div>` : ""}
       <div class="section">
         <h3>Steps to Reproduce</h3>
@@ -180,6 +182,7 @@ function renderReport(report, hasApiKey = false, aiMessage = "") {
       <div class="button-row">
         ${replayEventCount ? `<button class="button button-blue" id="replayButton">View Session Replay</button>` : ""}
         <button class="button button-blue" id="downloadButton">Download Report (.md)</button>
+        <button class="button button-blue" id="downloadJsonButton">Download Report (.json)</button>
         <button class="button button-light" id="resetButton">Clear & Record Again</button>
       </div>
     </section>
@@ -187,6 +190,7 @@ function renderReport(report, hasApiKey = false, aiMessage = "") {
 
   document.getElementById("settingsButton").addEventListener("click", openOptions);
   document.getElementById("downloadButton").addEventListener("click", () => downloadReport(activeReport));
+  document.getElementById("downloadJsonButton").addEventListener("click", () => downloadJsonReport(activeReport));
   document.getElementById("resetButton").addEventListener("click", resetReport);
 
   const replayButton = document.getElementById("replayButton");
@@ -284,8 +288,15 @@ function openOptions() {
 }
 
 function getReplayStatusText(report) {
-  const replayEventCount = Number(report.replayEventCount || 0);
-  if (replayEventCount) return `${replayEventCount} events captured`;
+  const replayEventCount = getTotalReplayEvents(report);
+  const replayTabCount = Array.isArray(report.replayTabs)
+    ? report.replayTabs.filter((tab) => Number(tab.eventCount || 0) > 0).length
+    : getReportTabs(report).filter((tab) => getTabReplayEventCount(tab) > 0).length;
+  if (replayEventCount) {
+    return replayTabCount > 1
+      ? `${replayEventCount} events captured across ${replayTabCount} tabs`
+      : `${replayEventCount} events captured`;
+  }
 
   const status = report.replayStatus || {};
   if (status.storageError) return `not captured (${status.storageError})`;
@@ -309,15 +320,217 @@ function buildStartErrorMessage(response) {
 
 function downloadReport(report) {
   const markdown = buildMarkdown(report);
-  const blob = new Blob([markdown], { type: "text/markdown;charset=utf-8" });
+  downloadTextFile(
+    markdown,
+    `bug-report-${formatFileDate(new Date(report.stoppedAt || Date.now()))}.md`,
+    "text/markdown;charset=utf-8"
+  );
+}
+
+function downloadRawJson(report) {
+  const rawJson = JSON.stringify(buildJsonDownloadReport(report), null, 2);
+  downloadTextFile(
+    rawJson,
+    `bug-report-${formatFileDate(new Date(report.stoppedAt || Date.now()))}.json`,
+    "application/json;charset=utf-8"
+  );
+}
+
+function downloadTextFile(content, filename, mimeType) {
+  const blob = new Blob([content], { type: mimeType });
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
-  link.download = `bug-report-${formatFileDate(new Date(report.stoppedAt || Date.now()))}.md`;
+  link.download = filename;
   document.body.appendChild(link);
   link.click();
   link.remove();
   URL.revokeObjectURL(url);
+}
+
+function downloadJsonReport(report) {
+  const json = JSON.stringify(buildJsonDownloadReport(report), null, 2);
+  downloadTextFile(
+    json,
+    `bug-report-${formatFileDate(new Date(report.stoppedAt || Date.now()))}.json`,
+    "application/json;charset=utf-8"
+  );
+}
+
+function buildJsonDownloadReport(report) {
+  const tabs = getReportTabs(report);
+  const normalizedEvents = dedupeReportEvents(getReportEvents(report), tabs);
+  const eventCountsByTab = countEventsByTab(normalizedEvents);
+  const screenshots = dedupeReportScreenshots(getReportScreenshots(report));
+  const screenshotByTab = new Map(screenshots.map((screenshot) => [String(screenshot.tabId), screenshot.screenshotId]));
+  const rootScreenshot = screenshots.find((screenshot) => screenshot.tabId === report.rootTabId) || screenshots[0] || null;
+  const summary = buildDownloadSummary(report, tabs, normalizedEvents, screenshots);
+
+  return removeEmptyFields({
+    version: report.version,
+    mode: report.mode,
+    rootTabId: report.rootTabId,
+    startedAt: report.startedAt,
+    stoppedAt: report.stoppedAt,
+    durationSeconds: report.durationSeconds,
+    summary,
+    events: normalizedEvents,
+    tabs: tabs.map((tab) => buildDownloadTab(
+      tab,
+      eventCountsByTab.get(String(tab.tabId)) || 0,
+      screenshotByTab.get(String(tab.tabId)) || null
+    )),
+    replayEventCount: report.replayEventCount,
+    replayTabs: report.replayTabs || [],
+    replayStatus: report.replayStatus || null,
+    screenshots,
+    primaryScreenshotId: rootScreenshot?.screenshotId || null,
+    screenshotError: screenshots.length ? null : report.screenshotError || null,
+    aiExplanation: report.aiExplanation || null
+  });
+}
+
+function buildDownloadTab(tab, eventCount, screenshotId) {
+  return removeEmptyFields({
+    tabId: tab.tabId,
+    title: tab.title || "",
+    url: tab.url || "",
+    windowId: tab.windowId,
+    startedAt: tab.startedAt,
+    activeRanges: tab.activeRanges,
+    eventCount,
+    replay: tab.replay ? {
+      eventCount: getTabReplayEventCount(tab),
+      truncated: Boolean(tab.replay.truncated),
+      truncatedReason: tab.replay.truncatedReason || null
+    } : null,
+    screenshotId,
+    screenshotError: tab.screenshotError || null
+  });
+}
+
+function countEventsByTab(events) {
+  return (Array.isArray(events) ? events : []).reduce((counts, event) => {
+    const tabKey = String(event.tabId || "");
+    counts.set(tabKey, (counts.get(tabKey) || 0) + 1);
+    return counts;
+  }, new Map());
+}
+
+function buildDownloadSummary(report, tabs, events, screenshots) {
+  return {
+    ...(report.summary || {}),
+    tabCount: tabs.length,
+    totalEvents: events.length,
+    totalReplayEvents: getTotalReplayEvents(report),
+    screenshotCount: screenshots.length
+  };
+}
+
+function dedupeReportEvents(events, tabs) {
+  const tabsById = new Map(tabs.map((tab) => [String(tab.tabId), tab]));
+  const byKey = new Map();
+
+  for (const event of Array.isArray(events) ? events : []) {
+    const key = getEventDedupeKey(event, tabsById);
+    const existing = byKey.get(key);
+    if (!existing || shouldPreferEvent(event, existing)) {
+      byKey.set(key, event);
+    }
+  }
+
+  return Array.from(byKey.values())
+    .sort((a, b) => Number(a.timestamp || 0) - Number(b.timestamp || 0))
+    .map((event) => ({ ...event }));
+}
+
+function getEventDedupeKey(event, tabsById) {
+  if (event?.type === "network" || event?.type === "networkError") {
+    return [
+      "network",
+      event.tabId || "",
+      String(event.method || "GET").toUpperCase(),
+      canonicalEventUrl(event, tabsById),
+      Number(event.statusCode || 0),
+      event.triggeredByActionId || "",
+      event.error || ""
+    ].join("|");
+  }
+
+  if (event?.eventId) return `eventId|${event.eventId}`;
+
+  return [
+    "event",
+    event?.tabId || "",
+    event?.type || "",
+    event?.timestamp || "",
+    event?.selector || "",
+    event?.message || "",
+    event?.url || ""
+  ].join("|");
+}
+
+function shouldPreferEvent(nextEvent, currentEvent) {
+  if (nextEvent.type === "network" && currentEvent.type === "networkError") return true;
+  if (nextEvent.type === "networkError" && currentEvent.type === "network") return false;
+  return getEventRichnessScore(nextEvent) > getEventRichnessScore(currentEvent);
+}
+
+function getEventRichnessScore(event) {
+  return [
+    event.responseBody,
+    event.responseHeaders && Object.keys(event.responseHeaders).length,
+    event.requestBody,
+    event.requestHeaders && Object.keys(event.requestHeaders).length,
+    Number.isFinite(event.durationMs),
+    event.source
+  ].reduce((score, value) => score + (value ? 1 : 0), 0);
+}
+
+function canonicalEventUrl(event, tabsById) {
+  const rawUrl = String(event?.url || "");
+  const tab = tabsById.get(String(event?.tabId));
+
+  try {
+    const parsed = new URL(rawUrl, tab?.url || undefined);
+    parsed.hash = "";
+    return parsed.toString();
+  } catch {
+    return rawUrl.split("#")[0];
+  }
+}
+
+function dedupeReportScreenshots(screenshots) {
+  const seen = new Map();
+  const result = [];
+
+  for (const screenshot of Array.isArray(screenshots) ? screenshots : []) {
+    if (!screenshot?.dataUrl) continue;
+    const existingId = seen.get(screenshot.dataUrl);
+    if (existingId) continue;
+
+    const screenshotId = `screenshot-${result.length + 1}`;
+    seen.set(screenshot.dataUrl, screenshotId);
+    result.push({
+      screenshotId,
+      tabId: screenshot.tabId,
+      title: screenshot.title || "",
+      url: screenshot.url || "",
+      reason: screenshot.reason || null,
+      eventType: screenshot.eventType || null,
+      severity: screenshot.severity || null,
+      capturedAt: screenshot.capturedAt || null,
+      dataUrl: screenshot.dataUrl
+    });
+  }
+
+  return result;
+}
+
+function removeEmptyFields(value) {
+  return Object.fromEntries(Object.entries(value).filter(([, fieldValue]) =>
+    fieldValue !== undefined && fieldValue !== null
+  ));
 }
 
 function buildMarkdown(report) {
@@ -326,20 +539,25 @@ function buildMarkdown(report) {
   const steps = events.filter((event) => event.type === "click" || event.type === "submit");
   const errors = events.filter((event) => event.type === "jsError");
   const consoleEvents = events.filter((event) => event.type === "console");
-  const networkErrors = events.filter((event) => event.type === "networkError");
+  const networkEvents = events.filter((event) => event.type === "network" || event.type === "networkError");
+  const networkErrors = networkEvents.filter((event) => event.type === "networkError" || event.error || Number(event.statusCode) >= 400);
   const rootTab = tabs.find((tab) => tab.tabId === report.rootTabId) || tabs[0] || {};
   const title = rootTab.title || rootTab.url || report.tabTitle || report.tabUrl || "Unknown Page";
+  const summary = report.summary || {};
+  const screenshots = getReportScreenshots(report);
 
   return `# Bug Report - ${escapeMarkdown(title)}
 
 **Recorded at:** ${formatDateTime(report.startedAt)}
 **Mode:** ${MODE_LABELS[normalizeMode(report.mode)] || "Current tab"}
 **Root URL:** ${rootTab.url || report.tabUrl || "Unknown"}
-**Captured tabs:** ${tabs.length}
+**Captured tabs:** ${summary.tabCount || tabs.length}
+**Total debug events:** ${summary.totalEvents ?? events.length}
+**Total replay events:** ${summary.totalReplayEvents ?? report.replayEventCount ?? 0}
 **Recording duration:** ${report.durationSeconds || 0} seconds
 
 ## Captured Tabs
-${tabs.length ? tabs.map((tab, index) => `${index + 1}. ${escapeMarkdown(tab.title || "Untitled")} - ${tab.url || "Unknown"} (${(tab.events || []).length} events)`).join("\n") : "(No tabs captured.)"}
+${tabs.length ? tabs.map((tab, index) => `${index + 1}. ${escapeMarkdown(tab.title || "Untitled")} - ${tab.url || "Unknown"} (${(tab.events || []).length} events, ${getTabReplayEventCount(tab)} replay events)`).join("\n") : "(No tabs captured.)"}
 
 ## Steps to Reproduce
 ${steps.length ? steps.map((event, index) => `${index + 1}. [${formatTime(event.timestamp)}] ${escapeMarkdown(describeStep(event))}`).join("\n") : "(No user actions captured.)"}
@@ -350,20 +568,23 @@ ${errors.length ? fenced(errors.map(formatError).join("\n\n")) : "(No JavaScript
 ## Network Errors
 ${networkErrors.length ? fenced(networkErrors.map(formatNetworkError).join("\n")) : "(No failed network requests captured.)"}
 
+## Network Requests
+${networkEvents.length ? fenced(networkEvents.map(formatNetworkRequest).join("\n\n")) : "(No network requests captured.)"}
+
 ## Console Log
 ${consoleEvents.length ? fenced(consoleEvents.map(formatConsoleEvent).join("\n")) : "(No console logs captured.)"}
 
-## Screenshot
-${report.screenshotBase64 ? `![screenshot](${report.screenshotBase64})` : `Screenshot unavailable${report.screenshotError ? `: ${report.screenshotError}` : "."}`}
+## Screenshots
+${buildMarkdownScreenshots(report, screenshots)}
 
 ## Session Replay
-${report.replayEventCount ? `Captured ${report.replayEventCount} replay events. Open the extension replay viewer to watch the session.` : "No session replay was captured."}
+${getTotalReplayEvents(report) ? `Captured ${getTotalReplayEvents(report)} replay events. Open the extension replay viewer to watch all clicked tabs or each tab separately.` : "No session replay was captured."}
 ${report.aiExplanation ? `
 ## Plain-English Explanation
 > ${report.aiExplanation.replace(/\n/g, "\n> ")}
 ` : ""}
-## Raw lastReport
-${fencedJson(report)}`;
+## Machine-readable Report
+Download the JSON report from the extension popup to inspect the full report v2 payload, including replay events.`;
 }
 
 function sendMessage(message) {
@@ -382,7 +603,7 @@ function countEvents(events = []) {
       counts[event.type] += 1;
     }
     return counts;
-  }, { console: 0, consoleError: 0, jsError: 0, click: 0, submit: 0, networkError: 0 });
+  }, { console: 0, consoleError: 0, jsError: 0, click: 0, submit: 0, network: 0, networkError: 0 });
 }
 
 function getReportTabs(report) {
@@ -397,6 +618,93 @@ function getReportTabs(report) {
 
 function getReportEvents(report) {
   return getReportTabs(report).flatMap((tab) => Array.isArray(tab.events) ? tab.events : []);
+}
+
+function getTabReplayEvents(tab) {
+  if (Array.isArray(tab?.replay?.events)) return tab.replay.events;
+  if (Array.isArray(tab?.replayEvents)) return tab.replayEvents;
+  return [];
+}
+
+function getTabReplayEventCount(tab) {
+  if (Number(tab?.replay?.eventCount)) return Number(tab.replay.eventCount);
+  if (Number(tab?.replayEventCount)) return Number(tab.replayEventCount);
+  return getTabReplayEvents(tab).length;
+}
+
+function getTotalReplayEvents(report) {
+  if (Number(report?.summary?.totalReplayEvents)) return Number(report.summary.totalReplayEvents);
+  if (Number(report?.replayEventCount)) return Number(report.replayEventCount);
+  return getReportTabs(report).reduce((total, tab) => total + getTabReplayEventCount(tab), 0);
+}
+
+function getReportScreenshots(report) {
+  if (Array.isArray(report?.screenshots) && report.screenshots.length) {
+    return report.screenshots.filter((screenshot) => screenshot?.dataUrl);
+  }
+
+  if (report?.screenshotBase64) {
+    const tabs = getReportTabs(report);
+    const rootTab = tabs.find((tab) => tab.tabId === report.rootTabId) || tabs[0] || {};
+    return [{
+      tabId: rootTab.tabId || report.rootTabId || 0,
+      title: rootTab.title || report.tabTitle || "",
+      url: rootTab.url || report.tabUrl || "",
+      dataUrl: report.screenshotBase64,
+      reason: "legacy",
+      eventType: null,
+      severity: null,
+      capturedAt: null
+    }];
+  }
+
+  return [];
+}
+
+function renderScreenshotPreview(report, screenshots) {
+  if (!screenshots.length) {
+    return `<div class="notice">Screenshot unavailable${report.screenshotError ? `: ${escapeHtml(report.screenshotError)}` : ""}</div>`;
+  }
+
+  return `
+    <div class="section">
+      <h3>${screenshots.length > 1 ? "Screenshots" : "Screenshot"}</h3>
+      <div class="screenshot-grid">
+        ${screenshots.map((screenshot, index) => `
+          <figure class="screenshot-card">
+            <img class="preview-image" src="${screenshot.dataUrl}" alt="Captured screenshot ${index + 1}">
+            <figcaption>
+              <strong>${escapeHtml(screenshot.title || `Tab ${screenshot.tabId || index + 1}`)}</strong>
+              <span>${escapeHtml(formatScreenshotMeta(screenshot))}</span>
+            </figcaption>
+          </figure>
+        `).join("")}
+      </div>
+    </div>
+  `;
+}
+
+function buildMarkdownScreenshots(report, screenshots) {
+  if (!screenshots.length) {
+    return `Screenshot unavailable${report.screenshotError ? `: ${report.screenshotError}` : "."}`;
+  }
+
+  return screenshots.map((screenshot, index) => {
+    const title = screenshot.title || `Tab ${screenshot.tabId || index + 1}`;
+    const url = screenshot.url ? `\nURL: ${screenshot.url}` : "";
+    const meta = formatScreenshotMeta(screenshot);
+    return `### ${escapeMarkdown(title)}${url}\n${meta}\n\n![screenshot-${index + 1}](${screenshot.dataUrl})`;
+  }).join("\n\n");
+}
+
+function formatScreenshotMeta(screenshot) {
+  const reason = screenshot.reason === "error"
+    ? `on ${screenshot.severity || screenshot.eventType || "error"}`
+    : screenshot.reason === "stopFallback"
+      ? "on stop fallback"
+      : "captured";
+  const time = screenshot.capturedAt ? ` at ${formatTime(screenshot.capturedAt)}` : "";
+  return `Tab ${screenshot.tabId || "unknown"} - ${reason}${time}`;
 }
 
 function getRecordingTabs(recordingState) {
@@ -429,7 +737,7 @@ function renderTabList(tabs) {
         <li>
           <strong>${escapeHtml(tab.title || "Untitled")}</strong>
           <span>${escapeHtml(tab.url || "Unknown URL")}</span>
-          ${Array.isArray(tab.events) ? `<em>${tab.events.length} events</em>` : ""}
+          ${Array.isArray(tab.events) ? `<em>${tab.events.length} events, ${getTabReplayEventCount(tab)} replay</em>` : ""}
         </li>
       `).join("")}
     </ul>
@@ -467,6 +775,15 @@ function formatNetworkError(event) {
 
 function formatNetworkErrorPreview(event) {
   return truncateForPreview(formatNetworkError(event));
+}
+
+function formatNetworkRequest(event) {
+  const status = event.statusCode ? `status ${event.statusCode}` : event.error || "pending/failed";
+  const duration = Number.isFinite(event.durationMs) ? ` in ${event.durationMs}ms` : "";
+  const action = event.triggeredByActionId ? `\nTriggered by: ${event.triggeredByActionId}` : "";
+  const requestBody = event.requestBody ? `\nRequest body: ${event.requestBody}` : "";
+  const responseBody = event.responseBody ? `\nResponse body: ${event.responseBody}` : "";
+  return `[${formatTime(event.timestamp)}] ${event.method || "GET"} ${event.url} - ${status}${duration}${action}${requestBody}${responseBody}`;
 }
 
 function formatConsoleEvent(event) {
@@ -511,10 +828,6 @@ function formatFileDate(date) {
 
 function fenced(text) {
   return "```text\n" + String(text).replace(/```/g, "'''") + "\n```";
-}
-
-function fencedJson(value) {
-  return "```json\n" + JSON.stringify(value, null, 2).replace(/```/g, "'''") + "\n```";
 }
 
 function escapeHtml(value) {

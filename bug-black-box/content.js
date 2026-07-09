@@ -3,6 +3,8 @@
   window.__bugBlackBoxContentInstalled = true;
 
   const MAX_TEXT_LENGTH = 80;
+  let replayWakeRequested = false;
+  let replayWakeInFlight = false;
 
   chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     if (message?.action === "bugBlackBoxPing") {
@@ -22,6 +24,10 @@
       // The extension may have been reloaded while the page is still open.
     });
   });
+
+  document.addEventListener("pointerdown", () => {
+    prepareReplayForInteraction();
+  }, true);
 
   document.addEventListener("click", (event) => {
     const element = getClickableElement(event.target);
@@ -60,6 +66,21 @@
     return element.closest(
       "button, a, input, textarea, select, label, summary, [role='button'], [role='link'], [role='menuitem'], [tabindex]"
     ) || element;
+  }
+
+  function prepareReplayForInteraction() {
+    if (replayWakeRequested || replayWakeInFlight) return;
+
+    replayWakeInFlight = true;
+    chrome.runtime.sendMessage({
+      action: "prepareReplayForInteraction"
+    }).then((response) => {
+      replayWakeRequested = Boolean(response?.ok && response?.recording);
+    }).catch(() => {
+      // The extension may have been reloaded while the page is still open.
+    }).finally(() => {
+      replayWakeInFlight = false;
+    });
   }
 
   function getSafeElementText(element) {

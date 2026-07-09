@@ -23,7 +23,22 @@
           "message": "Payment token missing",
           "timestamp": 1751800020000
         }
-      ]
+      ],
+      "replay": {
+        "events": [
+          {
+            "type": 4,
+            "timestamp": 1751800015100,
+            "data": {
+              "href": "https://example.com/checkout"
+            }
+          }
+        ],
+        "truncated": false,
+        "truncatedReason": null
+      },
+      "screenshotBase64": "data:image/png;base64,...",
+      "screenshotError": null
     },
     {
       "tabId": 456,
@@ -47,9 +62,29 @@
           "stack": "TypeError: Cannot read properties of undefined",
           "timestamp": 1751800028000
         }
-      ]
+      ],
+      "replay": {
+        "events": [
+          {
+            "type": 4,
+            "timestamp": 1751800024100,
+            "data": {
+              "href": "https://example.com/payment"
+            }
+          }
+        ],
+        "truncated": false,
+        "truncatedReason": null
+      },
+      "screenshotBase64": null,
+      "screenshotError": null
     }
   ],
+  "summary": {
+    "tabCount": 2,
+    "totalEvents": 4,
+    "totalReplayEvents": 2
+  },
   "screenshotBase64": "data:image/png;base64,...",
   "screenshotError": null,
   "aiExplanation": null

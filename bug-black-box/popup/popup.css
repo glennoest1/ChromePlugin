@@ -8,6 +8,7 @@
   --red: #dc2626;
   --red-soft: #fef2f2;
   --blue: #2563eb;
+  --yellow: #f59e0b;
   --green: #15803d;
   --green-soft: #f0fdf4;
   --dark: #374151;
@@ -99,6 +100,11 @@ h3 {
 
 .button-blue {
   background: var(--blue);
+}
+
+.button-yellow {
+  background: var(--yellow);
+  color: #111827;
 }
 
 .button-light {
@@ -237,6 +243,40 @@ h3 {
   border: 1px solid var(--border);
   border-radius: 8px;
   background: #ffffff;
+}
+
+.screenshot-grid {
+  display: grid;
+  gap: 8px;
+}
+
+.screenshot-card {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  padding: 8px;
+}
+
+.screenshot-card .preview-image {
+  max-height: 130px;
+}
+
+.screenshot-card figcaption {
+  display: grid;
+  gap: 2px;
+}
+
+.screenshot-card figcaption strong,
+.screenshot-card figcaption span {
+  overflow-wrap: anywhere;
+}
+
+.screenshot-card figcaption span {
+  color: var(--muted);
+  font-size: 12px;
 }
 
 .section {

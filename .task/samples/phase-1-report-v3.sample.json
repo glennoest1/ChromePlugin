@@ -1,0 +1,102 @@
+{
+  "version": 3,
+  "mode": "allTabs",
+  "rootTabId": 123,
+  "startedAt": 1751800015000,
+  "stoppedAt": 1751800020000,
+  "durationSeconds": 5,
+  "events": [
+    {
+      "type": "tabFocus",
+      "tabId": 123,
+      "windowId": 1,
+      "timestamp": 1751800015000,
+      "relativeTime": 0
+    },
+    {
+      "type": "click",
+      "eventId": "action-1751800015000-1",
+      "tabId": 123,
+      "selector": "#save",
+      "text": "Save",
+      "timestamp": 1751800016100,
+      "relativeTime": 1100
+    },
+    {
+      "type": "network",
+      "tabId": 123,
+      "source": "fetch",
+      "method": "POST",
+      "url": "https://example.test/api/items",
+      "requestHeaders": {
+        "content-type": "application/json",
+        "authorization": "[redacted]"
+      },
+      "requestBody": "{\"name\":\"demo\"}",
+      "responseHeaders": {
+        "content-type": "application/json"
+      },
+      "responseBody": "{\"ok\":false,\"message\":\"Name already exists\"}",
+      "statusCode": 409,
+      "durationMs": 184,
+      "triggeredByActionId": "action-1751800015000-1",
+      "timestamp": 1751800016120,
+      "relativeTime": 1120
+    }
+  ],
+  "globalTimeline": [
+    {
+      "timestamp": 1751800015000,
+      "relativeTime": 0,
+      "tabId": 123,
+      "eventIndex": 0
+    },
+    {
+      "timestamp": 1751800016100,
+      "relativeTime": 1100,
+      "tabId": 123,
+      "eventIndex": 1
+    },
+    {
+      "timestamp": 1751800016120,
+      "relativeTime": 1120,
+      "tabId": 123,
+      "eventIndex": 2
+    }
+  ],
+  "replayEvents": [
+    {
+      "type": 4,
+      "timestamp": 1751800015050,
+      "relativeTime": 50,
+      "data": {}
+    }
+  ],
+  "replayEventCount": 1,
+  "tabs": [
+    {
+      "tabId": 123,
+      "url": "https://example.test/",
+      "title": "Example",
+      "startedAt": 1751800015000,
+      "activeRanges": [
+        {
+          "focusedAt": 1751800015000,
+          "blurredAt": 1751800020000
+        }
+      ],
+      "events": [
+        {
+          "type": "tabFocus",
+          "tabId": 123,
+          "windowId": 1,
+          "timestamp": 1751800015000,
+          "relativeTime": 0
+        }
+      ]
+    }
+  ],
+  "screenshotBase64": null,
+  "screenshotError": null,
+  "aiExplanation": null
+}

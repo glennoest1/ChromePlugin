@@ -57,6 +57,24 @@ h1 {
   gap: 8px;
 }
 
+.tab-control {
+  display: grid;
+  gap: 4px;
+  min-width: min(420px, 38vw);
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.tab-control select {
+  min-height: 38px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: #ffffff;
+  color: var(--text);
+  padding: 0 10px;
+  font: inherit;
+}
+
 .summary div {
   min-width: 112px;
   border: 1px solid var(--border);
@@ -181,6 +199,10 @@ h1 {
   .summary {
     display: grid;
     grid-template-columns: 1fr 1fr;
+  }
+
+  .tab-control {
+    min-width: 0;
   }
 
   .controls {
