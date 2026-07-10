@@ -42,7 +42,7 @@ function verifyCssFile(filePath) {
 
 // Example invocation if run directly via Node
 if (typeof process !== "undefined" && require.main === module) {
-  const popupCssPath = path.resolve(__dirname, '../../bug-black-box/popup/popup.css');
+  const popupCssPath = path.resolve(__dirname, '../../../bug-black-box/popup/popup.css');
   console.log(`Auditing popup.css: ${popupCssPath}`);
   const result = verifyCssFile(popupCssPath);
   console.log(JSON.stringify(result, null, 2));

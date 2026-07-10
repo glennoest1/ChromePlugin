@@ -4,341 +4,41 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Bug Black Box</title>
-  <meta name="description" content="Bug Black Box records browser bug context into a local, shareable report for developers.">
-  <style>
-    :root {
-      color-scheme: light;
-      --ink: #172026;
-      --muted: #5d6872;
-      --line: #d7dde3;
-      --paper: #f7f8f4;
-      --panel: #ffffff;
-      --accent: #0f6b5f;
-      --accent-strong: #0a4e45;
-      --warn: #9a5b00;
-      --code: #243447;
-    }
-
-    * {
-      box-sizing: border-box;
-    }
-
-    body {
-      margin: 0;
-      color: var(--ink);
-      background: var(--paper);
-      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      line-height: 1.55;
-    }
-
-    a {
-      color: var(--accent-strong);
-    }
-
-    .topbar {
-      position: sticky;
-      top: 0;
-      z-index: 10;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 24px;
-      min-height: 68px;
-      padding: 0 32px;
-      border-bottom: 1px solid rgba(23, 32, 38, 0.12);
-      background: rgba(247, 248, 244, 0.94);
-      backdrop-filter: blur(12px);
-    }
-
-    .brand {
-      display: inline-flex;
-      align-items: center;
-      gap: 12px;
-      min-width: 0;
-      color: var(--ink);
-      font-weight: 750;
-      text-decoration: none;
-    }
-
-    .brand img {
-      width: 32px;
-      height: 32px;
-      border-radius: 7px;
-    }
-
-    nav {
-      display: flex;
-      align-items: center;
-      gap: 18px;
-      color: var(--muted);
-      font-size: 14px;
-    }
-
-    nav a {
-      color: inherit;
-      text-decoration: none;
-    }
-
-    nav a:hover {
-      color: var(--ink);
-    }
-
-    .hero {
-      display: grid;
-      grid-template-columns: minmax(0, 1.05fr) minmax(320px, 0.95fr);
-      gap: 48px;
-      align-items: center;
-      min-height: calc(100svh - 112px);
-      padding: 72px 32px 52px;
-      max-width: 1160px;
-      margin: 0 auto;
-    }
-
-    .eyebrow {
-      margin: 0 0 14px;
-      color: var(--warn);
-      font-size: 13px;
-      font-weight: 750;
-      letter-spacing: 0;
-      text-transform: uppercase;
-    }
-
-    h1 {
-      margin: 0;
-      max-width: 760px;
-      font-size: clamp(42px, 8vw, 78px);
-      line-height: 0.96;
-      letter-spacing: 0;
-    }
-
-    .lead {
-      max-width: 670px;
-      margin: 24px 0 0;
-      color: var(--muted);
-      font-size: 20px;
-    }
-
-    .actions {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 12px;
-      margin-top: 32px;
-    }
-
-    .btn {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      min-height: 44px;
-      padding: 0 18px;
-      border: 1px solid var(--line);
-      border-radius: 7px;
-      color: var(--ink);
-      background: var(--panel);
-      font-weight: 700;
-      text-decoration: none;
-    }
-
-    .btn-primary {
-      border-color: var(--accent);
-      color: #fff;
-      background: var(--accent);
-    }
-
-    .btn-primary:hover {
-      background: var(--accent-strong);
-    }
-
-    .terminal {
-      overflow: hidden;
-      border: 1px solid #22313f;
-      border-radius: 8px;
-      background: var(--code);
-      color: #e8f1f2;
-      box-shadow: 0 22px 70px rgba(23, 32, 38, 0.2);
-    }
-
-    .terminal-head {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 16px;
-      padding: 14px 16px;
-      border-bottom: 1px solid rgba(255, 255, 255, 0.12);
-      color: #a9bac4;
-      font-size: 13px;
-    }
-
-    .dots {
-      display: inline-flex;
-      gap: 6px;
-    }
-
-    .dots span {
-      display: block;
-      width: 10px;
-      height: 10px;
-      border-radius: 50%;
-      background: #e15b64;
-    }
-
-    .dots span:nth-child(2) {
-      background: #e5b454;
-    }
-
-    .dots span:nth-child(3) {
-      background: #54b585;
-    }
-
-    .report {
-      margin: 0;
-      padding: 20px;
-      overflow: auto;
-      font: 13px/1.6 ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
-      white-space: pre-wrap;
-    }
-
-    .band {
-      border-top: 1px solid var(--line);
-      background: var(--panel);
-    }
-
-    .inner {
-      max-width: 1160px;
-      margin: 0 auto;
-      padding: 58px 32px;
-    }
-
-    h2 {
-      margin: 0 0 18px;
-      font-size: 32px;
-      line-height: 1.1;
-      letter-spacing: 0;
-    }
-
-    .grid {
-      display: grid;
-      grid-template-columns: repeat(3, minmax(0, 1fr));
-      gap: 18px;
-      margin-top: 26px;
-    }
-
-    .card {
-      min-height: 168px;
-      padding: 20px;
-      border: 1px solid var(--line);
-      border-radius: 8px;
-      background: #fff;
-    }
-
-    .card h3 {
-      margin: 0 0 10px;
-      font-size: 18px;
-      letter-spacing: 0;
-    }
-
-    .card p,
-    .card ul {
-      margin: 0;
-      color: var(--muted);
-    }
-
-    .card ul {
-      padding-left: 18px;
-    }
-
-    .split {
-      display: grid;
-      grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
-      gap: 38px;
-      align-items: start;
-    }
-
-    .facts {
-      display: grid;
-      gap: 12px;
-      margin: 0;
-    }
-
-    .fact {
-      display: grid;
-      grid-template-columns: 180px minmax(0, 1fr);
-      gap: 18px;
-      padding: 14px 0;
-      border-bottom: 1px solid var(--line);
-    }
-
-    .fact dt {
-      color: var(--ink);
-      font-weight: 750;
-    }
-
-    .fact dd {
-      margin: 0;
-      color: var(--muted);
-    }
-
-    footer {
-      padding: 28px 32px 40px;
-      color: var(--muted);
-      font-size: 14px;
-      text-align: center;
-    }
-
-    @media (max-width: 780px) {
-      .topbar {
-        align-items: flex-start;
-        flex-direction: column;
-        padding: 16px 20px;
+  <meta name="description" content="Record console logs, JavaScript exceptions, network requests, and user action trails into structured bug reports.">
+  <script>
+    (() => {
+      try {
+        const theme = localStorage.getItem("bbb-docs-theme");
+        if (theme === "light" || theme === "dark") {
+          document.documentElement.dataset.theme = theme;
+        }
+      } catch (err) {
+        document.documentElement.removeAttribute("data-theme");
       }
-
-      nav {
-        width: 100%;
-        justify-content: space-between;
-        gap: 10px;
-      }
-
-      .hero,
-      .split,
-      .grid {
-        grid-template-columns: 1fr;
-      }
-
-      .hero {
-        min-height: auto;
-        padding: 44px 20px 36px;
-      }
-
-      .inner {
-        padding: 44px 20px;
-      }
-
-      h1 {
-        font-size: 46px;
-      }
-
-      .lead {
-        font-size: 18px;
-      }
-
-      .fact {
-        grid-template-columns: 1fr;
-        gap: 4px;
-      }
-    }
-  </style>
+    })();
+  </script>
+  <link rel="stylesheet" href="./styles.css">
 </head>
 <body>
-  <header class="topbar">
-    <a class="brand" href="./index.html" aria-label="Bug Black Box home">
-      <img src="./icon128.png" alt="">
-      <span>Bug Black Box</span>
-    </a>
-    <nav aria-label="Primary navigation">
-      <a href="#features">Features</a>
-      <a href="#privacy">Privacy</a>
-      <a href="./privacy.html">Policy</a>
-    </nav>
+  <header class="site-header">
+    <div class="topbar topbar-wide">
+      <a class="brand" href="./index.html" aria-label="Bug Black Box home">
+        <img src="./icon128.png" alt="">
+        <span>Bug Black Box</span>
+      </a>
+      <div class="nav-actions">
+        <nav aria-label="Primary navigation">
+          <a href="#features">Features</a>
+          <a href="#privacy">Privacy</a>
+          <a href="./privacy.html">Policy</a>
+        </nav>
+        <button class="theme-toggle" type="button" role="switch" aria-checked="false" data-theme-toggle aria-label="Use dark theme">
+          <span class="theme-toggle-track" aria-hidden="true">
+            <span class="theme-toggle-thumb"></span>
+          </span>
+        </button>
+      </div>
+    </div>
   </header>
 
   <main>
@@ -346,7 +46,7 @@
       <div>
         <p class="eyebrow">Chrome extension for web bug reports</p>
         <h1>Bug Black Box</h1>
-        <p class="lead">Record the context around a browser bug, then export a structured local report with user actions, console logs, JavaScript errors, failed network requests, screenshots, and session replay data.</p>
+        <p class="lead">Record console logs, JavaScript exceptions, network requests, and user action trails into structured bug reports.</p>
         <div class="actions">
           <a class="btn btn-primary" href="#" aria-label="Add Bug Black Box to Chrome">Add to Chrome</a>
           <a class="btn" href="./privacy.html">Privacy Policy</a>
@@ -413,22 +113,53 @@ Captured replay events for local playback.</pre>
       <div class="inner split">
         <div>
           <h2>Privacy by Explicit Recording</h2>
-          <p class="lead">Bug Black Box only records after the user clicks Start Recording. Data is stored in Chrome local extension storage unless the user exports it or explicitly uses AI Explain.</p>
+          <p class="lead">Bug Black Box is a developer-focused flight recorder for web applications. It monitors front-end execution parameters in real-time, helping QA engineers and software developers capture, trace, and explain bugs instantly without manually compiling reproduction steps.</p>
         </div>
         <dl class="facts">
           <div class="fact">
             <dt>Local storage</dt>
-            <dd>Reports, replay events, screenshots, and the optional Gemini API key are stored with `chrome.storage.local`.</dd>
+            <dd>Reports, replay events, screenshots, and the optional Gemini API key are stored with <code>chrome.storage.local</code>.</dd>
           </div>
           <div class="fact">
             <dt>Masked inputs</dt>
-            <dd>Password fields, typed input values, text areas, and contenteditable text are not intentionally included in action logs; rrweb input masking is enabled.</dd>
+            <dd>Sensitive values (e.g. passwords, bearer authorization tokens, cookies) are automatically redacted locally before any data is exported or analyzed.</dd>
           </div>
           <div class="fact">
             <dt>No backend</dt>
-            <dd>This phase does not upload reports or replay data to a Bug Black Box server.</dd>
+            <dd>Bug Black Box runs 100% locally. We do not host external tracking servers, send analytics, or transmit your session logs.</dd>
           </div>
         </dl>
+      </div>
+    </section>
+
+    <section class="band">
+      <div class="inner split">
+        <div>
+          <h2>Permission Transparency</h2>
+          <p class="lead">Every browser permission supports the single purpose of recording browser bug context after explicit user action.</p>
+        </div>
+        <div class="permissions">
+          <div class="permission">
+            <strong><code>activeTab</code> and <code>tabs</code></strong>
+            <span>Used exclusively to attach the recorder and sync recording timelines across the tab(s) you select. We do not track background tab activities.</span>
+          </div>
+          <div class="permission">
+            <strong><code>storage</code> and <code>unlimitedStorage</code></strong>
+            <span>Used to save your local extension state, session replay data, reports, screenshots, and optional Gemini API key locally on your device.</span>
+          </div>
+          <div class="permission">
+            <strong><code>scripting</code></strong>
+            <span>Used to inject the logging interface to read console warnings, errors, and click sequences.</span>
+          </div>
+          <div class="permission">
+            <strong><code>webRequest</code></strong>
+            <span>Used to observe request status, failed requests, and timing metadata while recording the tabs you choose.</span>
+          </div>
+          <div class="permission">
+            <strong>Host permissions</strong>
+            <span>Used only for pages you choose to record and for the Gemini endpoint when AI Explain is used.</span>
+          </div>
+        </div>
       </div>
     </section>
   </main>
@@ -436,5 +167,38 @@ Captured replay events for local playback.</pre>
   <footer>
     <span>Chrome Web Store URL pending. Replace the Add to Chrome placeholder after the store item is created.</span>
   </footer>
+
+  <script>
+    (() => {
+      const button = document.querySelector("[data-theme-toggle]");
+      if (!button) return;
+
+      const root = document.documentElement;
+      const media = window.matchMedia("(prefers-color-scheme: dark)");
+      const systemTheme = () => (media.matches ? "dark" : "light");
+      const currentTheme = () => root.dataset.theme || systemTheme();
+
+      const render = () => {
+        const theme = currentTheme();
+        const isDark = theme === "dark";
+        button.setAttribute("aria-checked", isDark ? "true" : "false");
+        button.setAttribute("aria-label", isDark ? "Use light theme" : "Use dark theme");
+      };
+
+      button.addEventListener("click", () => {
+        const nextTheme = currentTheme() === "dark" ? "light" : "dark";
+        root.dataset.theme = nextTheme;
+        try {
+          localStorage.setItem("bbb-docs-theme", nextTheme);
+        } catch (err) {
+          root.dataset.theme = nextTheme;
+        }
+        render();
+      });
+
+      media.addEventListener("change", render);
+      render();
+    })();
+  </script>
 </body>
 </html>

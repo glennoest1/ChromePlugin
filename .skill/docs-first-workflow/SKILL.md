@@ -24,6 +24,10 @@ Before inspecting or editing source files:
 
 Keep every code edit traceable to the user request and the existing docs. Do not add speculative behavior that is not requested or already documented.
 
+## Public Docs Rule
+
+When editing `docs/index.html` or `docs/privacy.html`, keep presentation styles in `docs/styles.css`. These pages should support both light and dark modes by using shared semantic tokens and optional `data-theme` overrides rather than duplicated inline CSS.
+
 After source changes, update `docs/` in the same session when the change adds, removes, or changes any of these:
 
 - feature behavior
