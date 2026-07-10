@@ -1,0 +1,204 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Bug Black Box</title>
+  <meta name="description" content="Record console logs, JavaScript exceptions, network requests, and user action trails into structured bug reports.">
+  <script>
+    (() => {
+      try {
+        const theme = localStorage.getItem("bbb-web-theme");
+        if (theme === "light" || theme === "dark") {
+          document.documentElement.dataset.theme = theme;
+        }
+      } catch (err) {
+        document.documentElement.removeAttribute("data-theme");
+      }
+    })();
+  </script>
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <header class="site-header">
+    <div class="topbar topbar-wide">
+      <a class="brand" href="./index.html" aria-label="Bug Black Box home">
+        <img src="./icon128.png" alt="">
+        <span>Bug Black Box</span>
+      </a>
+      <div class="nav-actions">
+        <nav aria-label="Primary navigation">
+          <a href="#features">Features</a>
+          <a href="#privacy">Privacy</a>
+          <a href="./privacy.html">Policy</a>
+        </nav>
+        <button class="theme-toggle" type="button" role="switch" aria-checked="false" data-theme-toggle aria-label="Use dark theme">
+          <span class="theme-toggle-track" aria-hidden="true">
+            <span class="theme-toggle-thumb"></span>
+          </span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <section class="hero">
+      <div>
+        <p class="eyebrow">Chrome extension for web bug reports</p>
+        <h1>Bug Black Box</h1>
+        <p class="lead">Record console logs, JavaScript exceptions, network requests, and user action trails into structured bug reports.</p>
+        <div class="actions">
+          <a class="btn btn-primary" href="#" aria-label="Add Bug Black Box to Chrome">Add to Chrome</a>
+          <a class="btn" href="./privacy.html">Privacy Policy</a>
+        </div>
+      </div>
+
+      <div class="terminal" aria-label="Example bug report preview">
+        <div class="terminal-head">
+          <span class="dots" aria-hidden="true"><span></span><span></span><span></span></span>
+          <span>bug-report.md</span>
+        </div>
+        <pre class="report"># Bug Report
+Mode: All tabs
+Captured tabs: 3
+
+## Steps to Reproduce
+1. Clicked "Checkout"
+2. Submitted "payment-form"
+
+## JavaScript Errors
+TypeError: Cannot read properties of undefined
+
+## Network Errors
+POST /api/orders status 500
+
+## Session Replay
+Captured replay events for local playback.</pre>
+      </div>
+    </section>
+
+    <section id="features" class="band">
+      <div class="inner">
+        <h2>What It Captures</h2>
+        <div class="grid">
+          <article class="card">
+            <h3>Browser evidence</h3>
+            <p>Console logs, console errors, JavaScript errors, failed requests, and a screenshot from the recorded root tab.</p>
+          </article>
+          <article class="card">
+            <h3>User actions</h3>
+            <p>Click and submit metadata are recorded as reproducible steps without storing typed input values.</p>
+          </article>
+          <article class="card">
+            <h3>Session replay</h3>
+            <p>rrweb session data is captured locally and played back in the extension replay viewer.</p>
+          </article>
+          <article class="card">
+            <h3>Multi-tab mode</h3>
+            <p>Record one tab or collect events from multiple recordable tabs in the same session.</p>
+          </article>
+          <article class="card">
+            <h3>Markdown export</h3>
+            <p>Download a Markdown report with the raw report JSON included for developer handoff.</p>
+          </article>
+          <article class="card">
+            <h3>AI Explain</h3>
+            <p>Optionally send selected report context to Gemini after you save your own API key and click Explain with AI.</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section id="privacy" class="band">
+      <div class="inner split">
+        <div>
+          <h2>Privacy by Explicit Recording</h2>
+          <p class="lead">Bug Black Box is a developer-focused flight recorder for web applications. It monitors front-end execution parameters in real-time, helping QA engineers and software developers capture, trace, and explain bugs instantly without manually compiling reproduction steps.</p>
+        </div>
+        <dl class="facts">
+          <div class="fact">
+            <dt>Local storage</dt>
+            <dd>Reports, replay events, screenshots, and the optional Gemini API key are stored with <code>chrome.storage.local</code>.</dd>
+          </div>
+          <div class="fact">
+            <dt>Masked inputs</dt>
+            <dd>Sensitive values (e.g. passwords, bearer authorization tokens, cookies) are automatically redacted locally before any data is exported or analyzed.</dd>
+          </div>
+          <div class="fact">
+            <dt>No backend</dt>
+            <dd>Bug Black Box runs 100% locally. We do not host external tracking servers, send analytics, or transmit your session logs.</dd>
+          </div>
+        </dl>
+      </div>
+    </section>
+
+    <section class="band">
+      <div class="inner split">
+        <div>
+          <h2>Permission Transparency</h2>
+          <p class="lead">Every browser permission supports the single purpose of recording browser bug context after explicit user action.</p>
+        </div>
+        <div class="permissions">
+          <div class="permission">
+            <strong><code>activeTab</code> and <code>tabs</code></strong>
+            <span>Used exclusively to attach the recorder and sync recording timelines across the tab(s) you select. We do not track background tab activities.</span>
+          </div>
+          <div class="permission">
+            <strong><code>storage</code> and <code>unlimitedStorage</code></strong>
+            <span>Used to save your local extension state, session replay data, reports, screenshots, and optional Gemini API key locally on your device.</span>
+          </div>
+          <div class="permission">
+            <strong><code>scripting</code></strong>
+            <span>Used to inject the logging interface to read console warnings, errors, and click sequences.</span>
+          </div>
+          <div class="permission">
+            <strong><code>webRequest</code></strong>
+            <span>Used to observe request status, failed requests, and timing metadata while recording the tabs you choose.</span>
+          </div>
+          <div class="permission">
+            <strong>Host permissions</strong>
+            <span>Used only for pages you choose to record and for the Gemini endpoint when AI Explain is used.</span>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <span>Chrome Web Store URL pending. Replace the Add to Chrome placeholder after the store item is created.</span>
+  </footer>
+
+  <script>
+    (() => {
+      const button = document.querySelector("[data-theme-toggle]");
+      if (!button) return;
+
+      const root = document.documentElement;
+      const media = window.matchMedia("(prefers-color-scheme: dark)");
+      const systemTheme = () => (media.matches ? "dark" : "light");
+      const currentTheme = () => root.dataset.theme || systemTheme();
+
+      const render = () => {
+        const theme = currentTheme();
+        const isDark = theme === "dark";
+        button.setAttribute("aria-checked", isDark ? "true" : "false");
+        button.setAttribute("aria-label", isDark ? "Use light theme" : "Use dark theme");
+      };
+
+      button.addEventListener("click", () => {
+        const nextTheme = currentTheme() === "dark" ? "light" : "dark";
+        root.dataset.theme = nextTheme;
+        try {
+          localStorage.setItem("bbb-web-theme", nextTheme);
+        } catch (err) {
+          root.dataset.theme = nextTheme;
+        }
+        render();
+      });
+
+      media.addEventListener("change", render);
+      render();
+    })();
+  </script>
+</body>
+</html>

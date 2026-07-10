@@ -3,7 +3,7 @@
   "name": "Bug Black Box",
   "version": "1.0.0",
   "minimum_chrome_version": "111",
-  "description": "Record console logs, JavaScript errors, user actions, screenshots, and failed requests into a bug report.",
+  "description": "Record console logs, JavaScript errors, user actions, failed requests, screenshots, and replay into bug reports.",
   "permissions": [
     "storage",
     "activeTab",
