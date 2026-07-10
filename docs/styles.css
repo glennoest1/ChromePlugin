@@ -1,25 +1,27 @@
 :root {
   color-scheme: light dark;
-  --bg-app: #f8fafc;
+  --bg-app: #f7f8f5;
   --bg-panel: #ffffff;
-  --bg-elevated: #f1f5f9;
-  --border: #d8dee8;
-  --border-focus: #3b82f6;
-  --text-primary: #172026;
-  --text-secondary: #5d6872;
-  --text-muted: #7b8794;
+  --bg-elevated: #edf1f3;
+  --border: #d8ddd9;
+  --border-focus: #087668;
+  --text-primary: #192126;
+  --text-secondary: #566372;
+  --text-muted: #6f7b86;
   --status-record: #ef4444;
   --status-success: #10b981;
   --status-warning: #b45309;
   --status-error: #e11d48;
-  --action-blue: #2563eb;
-  --action-blue-hover: #1d4ed8;
-  --code-bg: #eef2f7;
-  --shadow: 0 16px 48px rgba(15, 23, 42, 0.12);
-  --header-bg: rgba(248, 250, 252, 0.92);
+  --action-blue: #087668;
+  --action-blue-hover: #075f55;
+  --code-bg: #eef2f0;
+  --shadow: 0 28px 72px rgba(42, 53, 45, 0.14);
+  --header-bg: rgba(247, 248, 245, 0.94);
   --soft-panel: rgba(23, 32, 38, 0.025);
-  --terminal-head: #e5eaf2;
-  --terminal-muted: #5d6872;
+  --terminal-bg: #24364a;
+  --terminal-head: #24364a;
+  --terminal-text: #ffffff;
+  --terminal-muted: #c4d0dc;
   --font-mono: "SF Mono", Consolas, "JetBrains Mono", Menlo, monospace;
   --ink: var(--text-primary);
   --muted: var(--text-secondary);
@@ -48,7 +50,9 @@
     --shadow: 0 16px 48px rgba(0, 0, 0, 0.24);
     --header-bg: rgba(15, 20, 28, 0.94);
     --soft-panel: rgba(255, 255, 255, 0.01);
+    --terminal-bg: #0b0f16;
     --terminal-head: #101721;
+    --terminal-text: #e2e8f0;
     --terminal-muted: #a9bac4;
   }
 }
@@ -68,7 +72,9 @@
   --shadow: 0 16px 48px rgba(0, 0, 0, 0.24);
   --header-bg: rgba(15, 20, 28, 0.94);
   --soft-panel: rgba(255, 255, 255, 0.01);
+  --terminal-bg: #0b0f16;
   --terminal-head: #101721;
+  --terminal-text: #e2e8f0;
   --terminal-muted: #a9bac4;
 }
 
@@ -340,8 +346,8 @@ li {
   overflow: hidden;
   border: 1px solid var(--border);
   border-radius: 8px;
-  background: var(--code);
-  color: var(--text-primary);
+  background: var(--terminal-bg);
+  color: var(--terminal-text);
   box-shadow: var(--shadow);
 }
 
@@ -382,6 +388,7 @@ li {
   margin: 0;
   padding: 20px;
   overflow: auto;
+  color: var(--terminal-text);
   font: 13px/1.6 ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
   white-space: pre-wrap;
 }
