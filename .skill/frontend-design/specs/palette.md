@@ -5,7 +5,7 @@ To build a professional, premium developer tool, we use a refined grayscale slat
 2. **Minimalist Borders**: Ultra-fine solid borders (`1px solid var(--border)`) to separate logical compartments.
 3. **Restrained Color Accents**: Flat indicators (sober red for recording, soft green for success, blue for actions) rather than heavy glows or gradients.
 4. **Stable token names**: Components must use the same semantic variables in both modes. Theme switching should change token values, not component selectors.
-5. **Public docs parity**: `docs/styles.css` is the shared stylesheet for `docs/index.html` and `docs/privacy.html`; both pages must support system light/dark mode and explicit `data-theme` overrides with these same token names.
+5. **Public website parity**: `web-office/styles.css` is the shared stylesheet for `web-office/index.html` and `web-office/privacy.html`; both pages must support system light/dark mode and explicit `data-theme` overrides with these same token names. Keep `docs/` reserved for extension documentation.
 
 ### CSS Variables Definition
 ```css

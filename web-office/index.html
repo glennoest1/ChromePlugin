@@ -8,7 +8,7 @@
   <script>
     (() => {
       try {
-        const theme = localStorage.getItem("bbb-docs-theme");
+        const theme = localStorage.getItem("bbb-web-theme");
         if (theme === "light" || theme === "dark") {
           document.documentElement.dataset.theme = theme;
         }
@@ -189,7 +189,7 @@ Captured replay events for local playback.</pre>
         const nextTheme = currentTheme() === "dark" ? "light" : "dark";
         root.dataset.theme = nextTheme;
         try {
-          localStorage.setItem("bbb-docs-theme", nextTheme);
+          localStorage.setItem("bbb-web-theme", nextTheme);
         } catch (err) {
           root.dataset.theme = nextTheme;
         }

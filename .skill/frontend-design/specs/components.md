@@ -4,9 +4,9 @@ Developers can copy these clean, professional CSS definitions directly into the 
 
 All components must consume semantic tokens (`--bg-app`, `--bg-panel`, `--text-primary`, `--border`, `--border-focus`) so the same markup works in light mode, dark mode, and explicit `[data-theme]` overrides.
 
-### Public documentation pages
+### Public website pages
 
-The static pages `docs/index.html` and `docs/privacy.html` must link to `docs/styles.css` for page layout, typography, cards, code blocks, navigation, and theme styling. Do not reintroduce large inline `<style>` blocks in these files. If a theme switcher is present, keep the persistent state in `localStorage` under `bbb-docs-theme` and let CSS react to `:root[data-theme]`.
+The static pages `web-office/index.html` and `web-office/privacy.html` must link to `web-office/styles.css` for page layout, typography, cards, code blocks, navigation, and theme styling. Do not reintroduce large inline `<style>` blocks in these files. If a theme switcher is present, keep the persistent state in `localStorage` under `bbb-web-theme` and let CSS react to `:root[data-theme]`. Keep `docs/` reserved for extension documentation.
 
 ### 🌟 CSS Specification for `popup/popup.css`
 ```css

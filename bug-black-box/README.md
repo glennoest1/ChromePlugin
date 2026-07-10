@@ -151,8 +151,8 @@ popup.js
 
 From the repository root, run:
 
-```powershell
-.\package.ps1
+```sh
+bash package.sh
 ```
 
 The script reads the manifest version and writes:

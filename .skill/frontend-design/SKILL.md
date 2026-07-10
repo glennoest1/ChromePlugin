@@ -54,9 +54,9 @@ Treat failure and emptiness as moments for direction, not mood. Explain what wen
 
 Keep the register conversational and tuned: plain verbs, sentence case, no filler, with tone matched to the brand and the audience. Let each element do exactly one job. A label labels, an example demonstrates, and nothing quietly does double duty.
 
-## Public docs site styling
+## Public website styling
 
-For public documentation pages under `docs/`, keep shared page styles in `docs/styles.css` instead of embedding page-level `<style>` blocks. The stylesheet must support light and dark modes through the shared semantic tokens, `prefers-color-scheme`, and optional `:root[data-theme="light"|"dark"]` overrides. Page HTML may include a small theme toggle script, but visual rules belong in the shared CSS file.
+For public website pages under `web-office/`, keep shared page styles in `web-office/styles.css` instead of embedding page-level `<style>` blocks. The stylesheet must support light and dark modes through the shared semantic tokens, `prefers-color-scheme`, and optional `:root[data-theme="light"|"dark"]` overrides. Page HTML may include a small theme toggle script, but visual rules belong in the shared CSS file. Keep `docs/` reserved for extension documentation.
 
 ---
 
