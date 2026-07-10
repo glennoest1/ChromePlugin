@@ -1,0 +1,4 @@
+interface:
+  display_name: "Docs First Workflow"
+  short_description: "Use docs before code and keep GitHub Copilot hooks aligned."
+  default_prompt: "Use the docs-first workflow for this project. Read docs/ before source code, keep docs updated after feature changes, and maintain .github/hooks if the workflow changes."

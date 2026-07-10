@@ -1,0 +1,354 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Bug Black Box Phase 1 Replay Test</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f8fafc;
+      --surface: #ffffff;
+      --text: #111827;
+      --muted: #64748b;
+      --border: #dbe3ef;
+      --blue: #1d4ed8;
+      --red: #b91c1c;
+      --green: #047857;
+      --yellow: #b45309;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font: 15px/1.5 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    main {
+      display: grid;
+      gap: 18px;
+      max-width: 1040px;
+      margin: 0 auto;
+      padding: 32px 18px;
+    }
+
+    header,
+    section {
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: var(--surface);
+      padding: 18px;
+    }
+
+    header {
+      display: grid;
+      gap: 8px;
+    }
+
+    h1,
+    h2,
+    p {
+      margin: 0;
+    }
+
+    h1 {
+      font-size: 24px;
+    }
+
+    h2 {
+      font-size: 16px;
+    }
+
+    .muted {
+      color: var(--muted);
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 14px;
+    }
+
+    .stack {
+      display: grid;
+      gap: 12px;
+    }
+
+    .actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    button,
+    .button-link {
+      min-height: 40px;
+      border: 0;
+      border-radius: 8px;
+      padding: 9px 12px;
+      background: var(--blue);
+      color: #ffffff;
+      font: inherit;
+      font-weight: 700;
+      text-decoration: none;
+      cursor: pointer;
+    }
+
+    button.danger {
+      background: var(--red);
+    }
+
+    button.good {
+      background: var(--green);
+    }
+
+    button.warn {
+      background: var(--yellow);
+    }
+
+    label {
+      display: grid;
+      gap: 5px;
+      font-weight: 700;
+    }
+
+    input,
+    textarea {
+      width: 100%;
+      min-height: 40px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 8px 10px;
+      font: inherit;
+    }
+
+    textarea {
+      min-height: 84px;
+      resize: vertical;
+    }
+
+    [contenteditable] {
+      min-height: 90px;
+      border: 1px dashed var(--border);
+      border-radius: 8px;
+      padding: 10px;
+      background: #f8fafc;
+    }
+
+    .dom-stage {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 6px;
+      min-height: 120px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px;
+      background: #f8fafc;
+    }
+
+    .tile {
+      display: grid;
+      place-items: center;
+      min-height: 32px;
+      border-radius: 6px;
+      background: #dbeafe;
+      color: #1e3a8a;
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .output {
+      min-height: 44px;
+      border-radius: 8px;
+      background: #0f172a;
+      color: #e2e8f0;
+      padding: 10px;
+      font: 12px/1.45 Consolas, "Liberation Mono", monospace;
+      white-space: pre-wrap;
+    }
+
+    @media (max-width: 780px) {
+      .grid {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <h1>Phase 1 Replay and Privacy Test</h1>
+      <p class="muted">Use this page with Bug Black Box Current tab and All tabs modes. Export JSON and Markdown, then search them for fake sensitive values.</p>
+      <p class="muted" id="tabModeLabel">Primary tab</p>
+    </header>
+
+    <div class="grid">
+      <section class="stack">
+        <h2>Privacy Inputs</h2>
+        <form id="loginForm">
+          <label>
+            Email
+            <input id="emailInput" name="email" type="email" value="privacy-user@example.test" autocomplete="username">
+          </label>
+          <label>
+            Password
+            <input id="passwordInput" name="password" type="password" value="fake-password-123" autocomplete="current-password">
+          </label>
+          <label>
+            API token
+            <input id="tokenInput" name="api_token" type="text" value="fake-token-123">
+          </label>
+          <label>
+            Notes textarea
+            <textarea id="notesInput" name="notes">textarea-secret-fake-123 must not be stored raw</textarea>
+          </label>
+          <button type="submit" class="good">Submit Login Form</button>
+        </form>
+
+        <label>
+          Contenteditable privacy field
+          <div id="editableField" class="bug-black-box-mask" contenteditable="true">contenteditable-secret-fake-123 must not be stored raw</div>
+        </label>
+      </section>
+
+      <section class="stack">
+        <h2>Capture Triggers</h2>
+        <div class="actions">
+          <button id="stepOne">Step 1</button>
+          <button id="stepTwo">Step 2</button>
+          <button id="stepThree">Step 3</button>
+          <button id="logButton">console.log</button>
+          <button id="warnButton" class="warn">console.warn</button>
+          <button id="consoleErrorButton" class="danger">console.error</button>
+          <button id="throwButton" class="danger">Throw JS Error</button>
+          <button id="promiseButton" class="danger">Reject Promise</button>
+          <button id="networkButton">Fail Network</button>
+        </div>
+        <a id="secondTabLink" class="button-link" target="_blank" rel="noopener" href="./phase-1-replay.html?tab=secondary&token=fake-token-123&password=fake-password-123">Open second tab with sensitive query</a>
+        <div class="output" id="flowOutput">Waiting for test actions...</div>
+      </section>
+    </div>
+
+    <section class="stack">
+      <h2>Frequent DOM Changes For Replay</h2>
+      <p class="muted">Start this while recording to exercise rrweb event volume, seek, pause, and storage truncation behavior.</p>
+      <div class="actions">
+        <button id="startDomButton">Start DOM churn</button>
+        <button id="stopDomButton" class="danger">Stop DOM churn</button>
+        <button id="burstDomButton" class="warn">Burst 200 changes</button>
+      </div>
+      <div class="dom-stage" id="domStage"></div>
+    </section>
+  </main>
+
+  <script>
+    const state = {
+      step: 0,
+      domTimer: null,
+      domTick: 0
+    };
+
+    const output = document.getElementById("flowOutput");
+    const tabParams = new URLSearchParams(window.location.search);
+    const isSecondary = tabParams.get("tab") === "secondary";
+
+    document.getElementById("tabModeLabel").textContent = isSecondary
+      ? "Secondary tab for All tabs recording"
+      : "Primary tab";
+
+    function writeOutput(message) {
+      output.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+    }
+
+    document.getElementById("loginForm").addEventListener("submit", (event) => {
+      event.preventDefault();
+      console.log("Phase 1 form submitted without logging raw field values");
+      writeOutput("Form submitted. Exported reports must not contain raw input values.");
+    });
+
+    document.getElementById("stepOne").addEventListener("click", () => {
+      state.step = 1;
+      writeOutput("Step 1 complete");
+    });
+
+    document.getElementById("stepTwo").addEventListener("click", () => {
+      state.step = 2;
+      writeOutput("Step 2 complete");
+    });
+
+    document.getElementById("stepThree").addEventListener("click", () => {
+      state.step = 3;
+      writeOutput("Step 3 complete");
+    });
+
+    document.getElementById("logButton").addEventListener("click", () => {
+      console.log("Phase 1 console.log event");
+    });
+
+    document.getElementById("warnButton").addEventListener("click", () => {
+      console.warn("Phase 1 console.warn event");
+    });
+
+    document.getElementById("consoleErrorButton").addEventListener("click", () => {
+      console.error("Phase 1 console.error event");
+    });
+
+    document.getElementById("throwButton").addEventListener("click", () => {
+      const user = undefined;
+      user.profile.name.toUpperCase();
+    });
+
+    document.getElementById("promiseButton").addEventListener("click", () => {
+      Promise.reject(new Error("Phase 1 unhandled promise rejection"));
+    });
+
+    document.getElementById("networkButton").addEventListener("click", () => {
+      fetch("./missing-phase-1-file.json?token=fake-token-123&apiKey=fake-api-key-123&password=fake-password-123")
+        .catch(() => console.warn("Phase 1 failing network request completed"));
+    });
+
+    document.getElementById("startDomButton").addEventListener("click", () => {
+      if (state.domTimer) return;
+      state.domTimer = window.setInterval(() => updateDomStage(15), 250);
+      writeOutput("DOM churn started");
+    });
+
+    document.getElementById("stopDomButton").addEventListener("click", () => {
+      if (state.domTimer) {
+        window.clearInterval(state.domTimer);
+        state.domTimer = null;
+      }
+      writeOutput("DOM churn stopped");
+    });
+
+    document.getElementById("burstDomButton").addEventListener("click", () => {
+      updateDomStage(200);
+      writeOutput("Burst DOM changes generated");
+    });
+
+    function updateDomStage(count) {
+      const stage = document.getElementById("domStage");
+      const fragment = document.createDocumentFragment();
+      for (let index = 0; index < count; index += 1) {
+        state.domTick += 1;
+        const tile = document.createElement("div");
+        tile.className = "tile";
+        tile.textContent = `DOM ${state.domTick}`;
+        fragment.appendChild(tile);
+      }
+      stage.appendChild(fragment);
+
+      while (stage.children.length > 50) {
+        stage.removeChild(stage.firstElementChild);
+      }
+    }
+
+    updateDomStage(10);
+  </script>
+</body>
+</html>

@@ -8,12 +8,26 @@
 </head>
 <body>
   <main class="page">
-    <section class="panel">
-      <h1>Bug Black Box Settings</h1>
-      <p class="muted">Save your Gemini API key locally to enable AI Explain. The key is not hardcoded into the extension.</p>
+    <div class="brand">
+      <span class="brand-dot"></span>
+      <h1>Bug Black Box</h1>
+    </div>
 
-      <label for="apiKey">Gemini API key</label>
-      <input id="apiKey" type="password" autocomplete="off" spellcheck="false" placeholder="AIza...">
+    <section class="panel">
+      <div>
+        <p class="panel-title">Gemini API Key</p>
+        <p class="panel-desc">Lưu API key Gemini tại đây để bật tính năng AI Explain. Key được lưu cục bộ trên trình duyệt của bạn, không gửi đi đâu.</p>
+      </div>
+
+      <hr class="divider">
+
+      <div>
+        <label class="field-label" for="apiKey">API Key</label>
+        <div class="input-wrap">
+          <input id="apiKey" type="password" autocomplete="off" spellcheck="false" placeholder="AIza...">
+          <button type="button" class="toggle-password" id="togglePassword" title="Show / Hide key" aria-label="Toggle key visibility">👁</button>
+        </div>
+      </div>
 
       <div class="actions">
         <button id="saveButton" class="button button-blue">Save Key</button>
@@ -21,8 +35,19 @@
       </div>
 
       <p id="status" class="status" role="status"></p>
+
+      <p class="info-footer">🔒 Key được lưu trong <code>chrome.storage.local</code> và chỉ được dùng để gọi Gemini API.</p>
     </section>
   </main>
   <script src="options.js"></script>
+  <script>
+    // Toggle password visibility
+    document.getElementById('togglePassword').addEventListener('click', function() {
+      const input = document.getElementById('apiKey');
+      const isPassword = input.type === 'password';
+      input.type = isPassword ? 'text' : 'password';
+      this.textContent = isPassword ? '🙈' : '👁';
+    });
+  </script>
 </body>
 </html>

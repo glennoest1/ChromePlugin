@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Privacy Policy - Bug Black Box</title>
+  <meta name="description" content="Privacy policy for the Bug Black Box Chrome extension.">
+  <script>
+    (() => {
+      try {
+        const theme = localStorage.getItem("bbb-web-theme");
+        if (theme === "light" || theme === "dark") {
+          document.documentElement.dataset.theme = theme;
+        }
+      } catch (err) {
+        document.documentElement.removeAttribute("data-theme");
+      }
+    })();
+  </script>
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body class="privacy-page">
+  <header class="site-header">
+    <div class="topbar">
+      <a class="brand" href="./index.html">
+        <img src="./icon128.png" alt="">
+        <span>Bug Black Box</span>
+      </a>
+      <div class="nav-actions">
+        <a href="./index.html">Back to Website</a>
+        <button class="theme-toggle" type="button" role="switch" aria-checked="false" data-theme-toggle aria-label="Use dark theme">
+          <span class="theme-toggle-track" aria-hidden="true">
+            <span class="theme-toggle-thumb"></span>
+          </span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main class="privacy-main">
+    <h1>Privacy Policy</h1>
+    <p class="lead">This policy describes the data handled by the Bug Black Box Chrome extension. Last updated: July 10, 2026.</p>
+
+    <div class="summary">
+      <div class="item">
+        <strong>Recording is explicit</strong>
+        <p>Bug Black Box records only after the user clicks Start Recording.</p>
+      </div>
+      <div class="item">
+        <strong>No Bug Black Box backend</strong>
+        <p>This phase does not upload reports, screenshots, or replay data to a Bug Black Box server.</p>
+      </div>
+    </div>
+
+    <h2>Data the Extension Records</h2>
+    <p>During an active recording session, Bug Black Box may collect browser context needed to reproduce and debug a web issue:</p>
+    <ul>
+      <li>Page URL and title for recorded tabs.</li>
+      <li>Console logs and console errors emitted by the page.</li>
+      <li>JavaScript error messages and stack traces.</li>
+      <li>User click and submit metadata, such as a selector and safe visible label text.</li>
+      <li>Failed network request metadata, including method, sanitized URL, status code, and browser network error text.</li>
+      <li>A screenshot of the visible viewport from the root tab when recording stops, when Chrome allows capture.</li>
+      <li>rrweb session replay events for local playback in the extension replay viewer.</li>
+    </ul>
+
+    <h2>Data the Extension Avoids Recording</h2>
+    <p>Bug Black Box is designed to avoid intentionally storing sensitive values that are not needed for bug reports:</p>
+    <ul>
+      <li>Password input values.</li>
+      <li>Text typed into normal input fields.</li>
+      <li>Text area content.</li>
+      <li><code>contenteditable</code> content.</li>
+      <li>Cookies.</li>
+      <li>Full <code>localStorage</code> or <code>sessionStorage</code> dumps.</li>
+      <li>Request bodies, response bodies, and request cookies.</li>
+    </ul>
+
+    <h2>Session Replay</h2>
+    <p>Session replay is recorded through rrweb. Replay data can include DOM session data, mouse interactions, scroll activity, and page changes needed for playback. rrweb input masking is enabled with <code>maskAllInputs: true</code>, and the extension also records action logs without typed input values.</p>
+    <p>Replay data is stored locally in Chrome extension storage and is played back by the local replay viewer bundled with the extension. Replay data is not uploaded to a Bug Black Box backend in this phase.</p>
+
+    <h2>AI Explain</h2>
+    <p>AI Explain is optional. The extension calls Gemini only when the user saves a Gemini API key and clicks Explain with AI on a report.</p>
+    <p>When using "Explain with AI", only the specific JavaScript exceptions and related stack traces are sent to the Gemini API endpoint to produce an explanation. Your credentials and full logs are never transmitted. Screenshots and rrweb replay events are not sent by the AI Explain request.</p>
+
+    <h2>Storage and Sharing</h2>
+    <p>Reports, replay events, screenshots, recording state, and the optional Gemini API key are stored in <code>chrome.storage.local</code>. The user can export a Markdown report. The user controls where exported reports are saved or shared.</p>
+    <p>Bug Black Box runs 100% locally. We do not host external tracking servers, send analytics, or transmit your session logs.</p>
+
+    <h2>Privacy &amp; Security</h2>
+    <ul class="disclosure">
+      <li>
+        <strong>Sensitive fields redaction</strong>
+        Sensitive values (e.g. passwords, bearer authorization tokens, cookies) are automatically redacted locally before any data is exported or analyzed.
+      </li>
+      <li>
+        <strong>No remote tracking</strong>
+        Bug Black Box runs 100% locally. We do not host external tracking servers, send analytics, or transmit your session logs.
+      </li>
+      <li>
+        <strong>Gemini API transparency</strong>
+        When using "Explain with AI", only the specific JavaScript exceptions and related stack traces are sent to the Gemini API endpoint to produce an explanation. Your credentials and full logs are never transmitted.
+      </li>
+    </ul>
+
+    <h2>URL Redaction</h2>
+    <p>Bug Black Box removes URL fragments and redacts query parameter values when parameter names include sensitive terms such as <code>password</code>, <code>token</code>, <code>secret</code>, <code>authorization</code>, <code>cookie</code>, <code>apiKey</code>, or <code>session</code>.</p>
+
+    <h2>Permissions</h2>
+    <p>The extension uses Chrome permissions only to provide its single purpose: recording browser bug context after explicit user action.</p>
+    <ul class="disclosure">
+      <li>
+        <strong><code>activeTab</code> and <code>tabs</code></strong>
+        Used exclusively to attach the recorder and sync recording timelines across the tab(s) you select. We do not track background tab activities.
+      </li>
+      <li>
+        <strong><code>storage</code> and <code>unlimitedStorage</code></strong>
+        Used to save your local extension state, session replay data, reports, screenshots, and optional Gemini API key locally on your device.
+      </li>
+      <li>
+        <strong><code>scripting</code></strong>
+        Used to inject the logging interface to read console warnings, errors, and click sequences.
+      </li>
+      <li>
+        <strong><code>webRequest</code></strong>
+        Used to observe request status, failed requests, and timing metadata while recording the tabs you choose.
+      </li>
+      <li>
+        <strong>Host permissions</strong>
+        Used only for pages you choose to record and for the Gemini endpoint when AI Explain is used.
+      </li>
+    </ul>
+
+    <h2>Contact</h2>
+    <p>Use the support contact listed in the Chrome Web Store listing for privacy questions or deletion requests. Local extension data can also be removed by clearing the extension data in Chrome or uninstalling the extension.</p>
+  </main>
+
+  <script>
+    (() => {
+      const button = document.querySelector("[data-theme-toggle]");
+      if (!button) return;
+
+      const root = document.documentElement;
+      const media = window.matchMedia("(prefers-color-scheme: dark)");
+      const systemTheme = () => (media.matches ? "dark" : "light");
+      const currentTheme = () => root.dataset.theme || systemTheme();
+
+      const render = () => {
+        const theme = currentTheme();
+        const isDark = theme === "dark";
+        button.setAttribute("aria-checked", isDark ? "true" : "false");
+        button.setAttribute("aria-label", isDark ? "Use light theme" : "Use dark theme");
+      };
+
+      button.addEventListener("click", () => {
+        const nextTheme = currentTheme() === "dark" ? "light" : "dark";
+        root.dataset.theme = nextTheme;
+        try {
+          localStorage.setItem("bbb-web-theme", nextTheme);
+        } catch (err) {
+          root.dataset.theme = nextTheme;
+        }
+        render();
+      });
+
+      media.addEventListener("change", render);
+      render();
+    })();
+  </script>
+</body>
+</html>
