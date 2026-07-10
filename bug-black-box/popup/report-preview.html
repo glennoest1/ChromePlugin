@@ -1,0 +1,204 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Report Preview — Bug Black Box</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+<main class="shell">
+<div id="app">
+<div class="report-shell">
+
+  <div class="report-top">
+    <div class="header">
+      <h1>Report Ready</h1>
+      <button class="icon-button" title="Settings">&#9881;</button>
+    </div>
+
+    <div class="report-hero-compact rh-error">
+      <span class="rhc-icon">&#9888;</span>
+      <span class="rhc-text">3 JS errors &middot; 2 console errors &middot; 1 failed request</span>
+    </div>
+
+    <div class="metrics-row">
+      <div class="metric-chip" title="Duration"><span class="mc-icon">&#9201;</span><span class="mc-val">19s</span></div>
+      <div class="metric-chip" title="Actions"><span class="mc-icon">&#9889;</span><span class="mc-val">22</span></div>
+      <div class="metric-chip" title="Logs"><span class="mc-icon">&#128204;</span><span class="mc-val">8</span></div>
+      <div class="metric-chip" title="Network"><span class="mc-icon">&#127760;</span><span class="mc-val">2</span></div>
+      <div class="metric-chip" title="Tabs"><span class="mc-icon">&#128194;</span><span class="mc-val">3</span></div>
+      <div class="metric-chip" title="Replay events"><span class="mc-icon">&#9654;</span><span class="mc-val">141</span></div>
+    </div>
+
+    <div class="page-meta">
+      <div class="pm-title">Multi-tab Recording (3 tabs)</div>
+      <div class="pm-url">Started from: 127.0.0.1:8080/test-pages/phase-1-replay.html</div>
+      <div class="pm-sub">All tabs &middot; 141 events captured across 2 tabs</div>
+    </div>
+
+    <nav class="tabs-nav" id="tabsNav" role="tablist">
+      <button class="tab-btn active" data-tab="steps" role="tab">Steps <span class="tbadge">10</span></button>
+      <button class="tab-btn" data-tab="errors" role="tab">Errors <span class="tbadge badge-red">5</span></button>
+      <button class="tab-btn" data-tab="network" role="tab">Network <span class="tbadge badge-red">1</span></button>
+      <button class="tab-btn" data-tab="ai" role="tab">AI &#10022;</button>
+      <button class="tab-btn" data-tab="media" role="tab">&#128247;&nbsp;2</button>
+      <button class="tab-btn" data-tab="tabs" role="tab">Tabs (3)</button>
+    </nav>
+  </div>
+
+  <!-- Tab body -->
+  <div class="tab-body" id="tabBody">
+    <!-- Steps tab (default) -->
+    <ul class="steps-list">
+      <li class="step-row"><span class="step-num">1</span><span class="step-verb sv-click">Click</span><span class="step-text">input[type=email]</span></li>
+      <li class="step-row"><span class="step-num">2</span><span class="step-verb sv-submit">Submit</span><span class="step-text">Login Form</span></li>
+      <li class="step-row"><span class="step-num">3</span><span class="step-verb sv-click">Click</span><span class="step-text">Submit Login Form</span></li>
+      <li class="step-row"><span class="step-num">4</span><span class="step-verb sv-submit">Submit</span><span class="step-text">Form submitted</span></li>
+      <li class="step-row"><span class="step-num">5</span><span class="step-verb sv-click">Click</span><span class="step-text">Submit Login Form</span></li>
+      <li class="step-row"><span class="step-num">6</span><span class="step-verb sv-submit">Submit</span><span class="step-text">Form submitted</span></li>
+      <li class="step-row"><span class="step-num">7</span><span class="step-verb sv-click">Click</span><span class="step-text">Step 3</span></li>
+      <li class="step-row"><span class="step-num">8</span><span class="step-verb sv-click">Click</span><span class="step-text">console.log</span></li>
+    </ul>
+    <div class="steps-pagination">
+      <button class="icon-button sp-prev" disabled title="Previous">&lsaquo;</button>
+      <button class="sp-num-btn active" data-page="0">1</button>
+      <button class="sp-num-btn" data-page="1">2</button>
+      <button class="icon-button sp-next" title="Next">&rsaquo;</button>
+    </div>
+  </div>
+
+  <div class="report-actions">
+    <button class="ra-btn ra-replay">&#9654; Replay</button>
+    <button class="ra-btn ra-dl">&#8595; .md</button>
+    <button class="ra-btn ra-dl">&#8595; .json</button>
+    <button class="ra-btn ra-clear">&#215; Clear</button>
+  </div>
+
+</div>
+</div>
+</main>
+
+<script>
+// Tab switching for preview
+const steps_html = `<ul class="steps-list">
+  <li class="step-row"><span class="step-num">1</span><span class="step-verb sv-click">Click</span><span class="step-text">input[type=email]</span></li>
+  <li class="step-row"><span class="step-num">2</span><span class="step-verb sv-submit">Submit</span><span class="step-text">Login Form</span></li>
+  <li class="step-row"><span class="step-num">3</span><span class="step-verb sv-click">Click</span><span class="step-text">Submit Login Form</span></li>
+  <li class="step-row"><span class="step-num">4</span><span class="step-verb sv-submit">Submit</span><span class="step-text">Form submitted</span></li>
+  <li class="step-row"><span class="step-num">5</span><span class="step-verb sv-click">Click</span><span class="step-text">Submit Login Form</span></li>
+  <li class="step-row"><span class="step-num">6</span><span class="step-verb sv-submit">Submit</span><span class="step-text">Form submitted</span></li>
+  <li class="step-row"><span class="step-num">7</span><span class="step-verb sv-click">Click</span><span class="step-text">Step 3</span></li>
+  <li class="step-row"><span class="step-num">8</span><span class="step-verb sv-click">Click</span><span class="step-text">console.log</span></li>
+</ul>
+<div class="steps-pagination">
+  <button class="icon-button sp-prev" disabled title="Previous">&lsaquo;</button>
+  <button class="sp-num-btn active" data-page="0">1</button>
+  <button class="sp-num-btn" data-page="1">2</button>
+  <button class="icon-button sp-next" title="Next">&rsaquo;</button>
+</div>`;
+
+const errors_html = `
+  <div class="err-card" id="ec0">
+    <div class="ec-head" data-i="0"><span class="ec-badge ecb-js">JS</span><span class="ec-time">02:01:24 PM</span><span class="ec-angle" id="eca0">&#8250;</span></div>
+    <div class="ec-msg">Uncaught TypeError: Cannot read properties of undefined (reading 'profile')</div>
+    <div class="ec-detail" id="ecd0" hidden>
+      <div class="ec-src">/test-pages/phase-1-replay.html:303:12</div>
+      <pre class="ec-stack">TypeError: Cannot read properties of undefined (reading 'profile')
+    at HTMLButtonElement.&lt;anonymous&gt; (.../phase-1-replay.html:303:12)</pre>
+    </div>
+  </div>
+  <div class="err-card" id="ec1">
+    <div class="ec-head" data-i="1"><span class="ec-badge ecb-js">JS</span><span class="ec-time">02:01:28 PM</span><span class="ec-angle" id="eca1">&#8250;</span></div>
+    <div class="ec-msg">Uncaught TypeError: Cannot read properties of undefined (reading 'total')</div>
+    <div class="ec-detail" id="ecd1" hidden>
+      <div class="ec-src">/test-page.html:122:12</div>
+      <pre class="ec-stack">TypeError: Cannot read properties of undefined (reading 'total')
+    at HTMLButtonElement.&lt;anonymous&gt; (.../test-page.html:122:12)</pre>
+    </div>
+  </div>
+  <div class="err-card" id="ec2">
+    <div class="ec-head" data-i="2"><span class="ec-badge ecb-js">JS</span><span class="ec-time">02:01:29 PM</span><span class="ec-angle" id="eca2">&#8250;</span></div>
+    <div class="ec-msg">Unhandled Promise Rejection: Error: Demo rejected promise</div>
+    <div class="ec-detail" id="ecd2" hidden>
+      <pre class="ec-stack">Error: Demo rejected promise
+    at HTMLButtonElement.&lt;anonymous&gt; (.../test-page.html:126:22)</pre>
+    </div>
+  </div>
+  <div class="err-card" id="ec3">
+    <div class="ec-head" data-i="3"><span class="ec-badge ecb-con">CON</span><span class="ec-time">02:01:23 PM</span><span class="ec-angle" id="eca3">&#8250;</span></div>
+    <div class="ec-msg">Phase 1 console.error event</div>
+    <div class="ec-detail" id="ecd3" hidden><pre class="ec-stack">Phase 1 console.error event</pre></div>
+  </div>
+  <div class="err-card" id="ec4">
+    <div class="ec-head" data-i="4"><span class="ec-badge ecb-con">CON</span><span class="ec-time">02:01:28 PM</span><span class="ec-angle" id="eca4">&#8250;</span></div>
+    <div class="ec-msg">Demo console error before the TypeError</div>
+    <div class="ec-detail" id="ecd4" hidden><pre class="ec-stack">Demo console error before the TypeError</pre></div>
+  </div>
+`;
+
+const network_html = `
+  <div class="net-row">
+    <span class="net-method">GET</span>
+    <span class="net-url" title="http://127.0.0.1:8080/definitely-missing-demo-file.json">/definitely-missing-demo-file.json</span>
+    <span class="net-status">404</span>
+    <span class="net-time">02:01:29 PM</span>
+  </div>
+`;
+
+const ai_html = `
+  <div class="ai-card">
+    <div class="ai-header">
+      <span class="ai-icon">&#10022;</span>
+      <div>
+        <div class="ai-title">Explain with Gemini</div>
+        <div class="ai-sub">Phân tích lỗi và đề xuất hướng sửa bằng AI</div>
+      </div>
+    </div>
+    <button class="button button-ai">Explain with AI</button>
+    <p class="ai-note">No API key saved. <a class="link-btn">Open Settings &rarr;</a></p>
+  </div>
+`;
+
+const media_html = `
+  <div class="media-card">
+    <div style="background:#f1f5f9;height:100px;display:flex;align-items:center;justify-content:center;color:#94a3b8;font-size:12px">Screenshot 1</div>
+    <div class="media-info"><div class="mi-title">Bug Black Box Phase 1 Replay Test</div><div class="mi-meta">Captured at console error - 02:01:23 PM</div></div>
+  </div>
+  <div class="media-card">
+    <div style="background:#f1f5f9;height:100px;display:flex;align-items:center;justify-content:center;color:#94a3b8;font-size:12px">Screenshot 2</div>
+    <div class="media-info"><div class="mi-title">Bug Black Box Test Page</div><div class="mi-meta">Captured at console error - 02:01:28 PM</div></div>
+  </div>
+`;
+
+const tabs_html = `
+  <div class="tlist-row"><div class="tlr-title">Bug Black Box Phase 1 Replay Test</div><div class="tlr-url">127.0.0.1:8080/test-pages/phase-1-replay.html</div><div class="tlr-counts">22 events &middot; 76 replay</div></div>
+  <div class="tlist-row"><div class="tlr-title">Bug Black Box Test Page</div><div class="tlr-url">127.0.0.1:8080/test-page.html</div><div class="tlr-counts">20 events &middot; 65 replay</div></div>
+  <div class="tlist-row"><div class="tlr-title">TikTok - Make Your Day</div><div class="tlr-url">www.tiktok.com/@issei.ch.nht/video/...</div><div class="tlr-counts">6 events &middot; 0 replay</div></div>
+`;
+
+const tabContent = {steps: steps_html, errors: errors_html, network: network_html, ai: ai_html, media: media_html, tabs: tabs_html};
+
+document.getElementById("tabsNav").addEventListener("click", e => {
+  const btn = e.target.closest(".tab-btn");
+  if (!btn) return;
+  document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
+  btn.classList.add("active");
+  const body = document.getElementById("tabBody");
+  body.innerHTML = tabContent[btn.dataset.tab] || "";
+  body.scrollTop = 0;
+  if (btn.dataset.tab === "errors") {
+    document.querySelectorAll(".ec-head").forEach(h => h.addEventListener("click", () => {
+      const i = h.dataset.i;
+      const d = document.getElementById("ecd"+i);
+      const a = document.getElementById("eca"+i);
+      const c = document.getElementById("ec"+i);
+      if (!d) return;
+      d.hidden = !d.hidden;
+      a.innerHTML = d.hidden ? "&#8250;" : "&#8964;";
+      c.classList.toggle("ec-open", !d.hidden);
+    }));
+  }
+});
+</script>
+</body>
+</html>

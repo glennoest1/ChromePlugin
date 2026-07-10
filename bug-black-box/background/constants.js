@@ -1,0 +1,8 @@
+const MAX_EVENTS = 500;
+const REPORT_VERSION = 3;
+const ACTION_CORRELATION_WINDOW_MS = 500;
+const SPAM_WINDOW_MS = 1000;
+const STOP_EVENT_GRACE_MS = 250;
+const RECORDING_MODES = new Set(["activeTab", "allTabs"]);
+const ACTION_EVENT_TYPES = new Set(["click", "submit"]);
+const CORRELATABLE_EVENT_TYPES = new Set(["console", "network", "networkError"]);

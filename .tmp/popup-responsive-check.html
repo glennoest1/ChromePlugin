@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Popup Responsive Check</title>
+  <link rel="stylesheet" href="../bug-black-box/popup/popup.css">
+</head>
+<body>
+  <main class="shell">
+    <section class="panel">
+      <div class="header">
+        <h1>Report Ready</h1>
+        <button class="icon-button" title="Settings" aria-label="Settings">&#9881;</button>
+      </div>
+      <div class="report-hero report-hero-error">
+        <strong>2 JS errors, 1 console error, 1 failed request found</strong>
+        <span>Use the replay, screenshot, and steps below to reproduce the issue.</span>
+      </div>
+      <div class="report-metrics">
+        <div><strong>20s</strong><span>Duration</span></div>
+        <div><strong>6</strong><span>Actions</span></div>
+        <div><strong>3</strong><span>Logs</span></div>
+        <div><strong>1</strong><span>Network</span></div>
+        <div><strong>1</strong><span>Tabs</span></div>
+        <div><strong>10</strong><span>Replay events</span></div>
+      </div>
+      <div class="report-meta">
+        <div>
+          <span>Page</span>
+          <strong>Bug Black Box Test Page</strong>
+          <em>http://127.0.0.1:8080/test-page.html</em>
+        </div>
+        <div>
+          <span>Recording</span>
+          <strong>Current tab</strong>
+          <em>10 events captured</em>
+        </div>
+      </div>
+      <div class="section">
+        <h3>Screenshot</h3>
+        <div class="screenshot-grid">
+          <figure class="screenshot-card">
+            <div class="preview-image"></div>
+            <figcaption>
+              <strong>Bug Black Box Test Page</strong>
+              <span>Captured at console error - 04:23:22 PM</span>
+            </figcaption>
+          </figure>
+        </div>
+      </div>
+      <div class="section">
+        <h3>Steps to Reproduce</h3>
+        <ol class="list">
+          <li>Click "input[type=text]" (selector: #demoText)</li>
+          <li>Click "Trigger TypeError" (selector: #typeErrorButton)</li>
+          <li>Click "Trigger Missing File Request" (selector: #networkButton)</li>
+        </ol>
+      </div>
+      <div class="section">
+        <h3>JavaScript Errors</h3>
+        <div class="code-block">[04:23:22 PM] Uncaught TypeError: Cannot read properties of undefined (reading 'total')</div>
+      </div>
+      <div class="button-row">
+        <button class="button button-blue">View Session Replay</button>
+        <button class="button button-blue">Download Report (.md)</button>
+        <button class="button button-blue">Download Report (.json)</button>
+        <button class="button button-light">Clear & Record Again</button>
+      </div>
+    </section>
+  </main>
+</body>
+</html>

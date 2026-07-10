@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Bug Black Box — UI Preview</title>
+  <style>
+    body {
+      margin: 0;
+      background: #1a1a2e;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 24px;
+      padding: 24px;
+      font-family: ui-sans-serif, system-ui, -apple-system, sans-serif;
+      justify-content: center;
+    }
+    .frame-label {
+      color: #636880;
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      margin-bottom: 8px;
+    }
+    .popup-frame {
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 12px;
+      overflow: hidden;
+      width: 380px;
+      height: 620px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.6);
+    }
+    iframe {
+      width: 100%;
+      height: 100%;
+      border: 0;
+    }
+  </style>
+</head>
+<body>
+  <div>
+    <p class="frame-label">Idle State</p>
+    <div class="popup-frame">
+      <iframe src="idle-preview.html" title="Idle state"></iframe>
+    </div>
+  </div>
+  <div>
+    <p class="frame-label">Recording State</p>
+    <div class="popup-frame">
+      <iframe src="recording-preview.html" title="Recording state"></iframe>
+    </div>
+  </div>
+  <div>
+    <p class="frame-label">Report State</p>
+    <div class="popup-frame">
+      <iframe src="report-preview.html" title="Report state"></iframe>
+    </div>
+  </div>
+</body>
+</html>

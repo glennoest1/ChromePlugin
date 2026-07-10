@@ -59,3 +59,75 @@ Bug Black Box allows developers to trace complex issues that span across multipl
 - **Sensitive Field Masking**: Headers, URLs, and bodies containing keywords like `password`, `token`, `secret`, `authorization`, `cookie`, `apiKey`, or `session` are automatically masked to `[redacted]`.
 - **Input Text Shielding**: Click events do not record input contents, textareas, or content-editable containers. They only store the target selector path (e.g., `input[type="password"]`).
 - **Local Storage Cache**: Data is cached in `chrome.storage.local`. No external server uploads or analytical calls are performed.
+- **Local Storage Cache**: Data is cached in `chrome.storage.local`. No external server uploads or analytical calls are performed.
+
+---
+
+## Task 06 Test Page and Privacy Audit
+
+Use this flow before release QA for Capture Engine 2.0.
+
+### Run the local test pages
+
+From the repository root:
+
+```powershell
+python -m http.server 8080
+```
+
+Open:
+
+```text
+http://127.0.0.1:8080/test-pages/phase-1-replay.html
+```
+
+The legacy smoke-test page is still available at:
+
+```text
+http://127.0.0.1:8080/test-page.html
+```
+
+### What the Phase 1 page covers
+
+- Login form with email, password, token, and textarea fields.
+- Fake sensitive values: `fake-password-123`, `fake-token-123`, `fake-api-key-123`, textarea secret, and contenteditable secret.
+- Multi-step click flow.
+- `console.log`, `console.warn`, and `console.error`.
+- Thrown JavaScript error.
+- Unhandled promise rejection.
+- Failing network request with sensitive query params.
+- Contenteditable privacy field.
+- High-frequency DOM changes for replay/storage testing.
+- A link that opens a second tab for All tabs recording.
+
+### Manual audit flow
+
+1. Load the unpacked extension from `bug-black-box`.
+2. Open the Phase 1 test page through localhost.
+3. Run a Current tab recording and trigger every button at least once.
+4. Stop recording, open replay, then verify play, pause, and seek.
+5. Export Markdown and JSON.
+6. Run an All tabs recording.
+7. Click the second-tab link, interact with both tabs, stop, and replay.
+8. Start DOM churn for a longer session and confirm storage truncation is graceful if limits are reached.
+9. Close one recorded tab before stopping and confirm report creation still succeeds.
+10. Try starting on `chrome://extensions` and confirm the popup shows a clear restricted-page error.
+
+### Privacy checklist
+
+Complete the tracked checklist before Task 05 release QA:
+
+```text
+.task/phase1/phase-1-privacy-checklist.md
+```
+
+The checklist must be verified against exported JSON and Markdown files, not only the popup UI. Search the exported files for every fake sensitive value and confirm there are no matches.
+
+### Expected privacy behavior
+
+- Password, token, email, textarea, and contenteditable values are not stored raw.
+- Sensitive URL query params are redacted to `[redacted]`.
+- Debug events store selectors and safe labels, not form values.
+- Replay has `maskAllInputs` enabled.
+- Replay masks contenteditable text through `maskTextSelector`.
+- Phase 1 data stays local in `chrome.storage.local` and local exports unless the user explicitly uses AI Explain.

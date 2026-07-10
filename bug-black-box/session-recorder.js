@@ -17,8 +17,10 @@
   chrome.storage.onChanged.addListener((changes, areaName) => {
     if (areaName !== "local" || !changes.recordingState) return;
 
-    replayArmed = shouldArmReplay(changes.recordingState.newValue);
-    if (!replayArmed && stopReplayRecording) {
+    const newState = changes.recordingState.newValue;
+    replayArmed = shouldArmReplay(newState);
+    
+    if (stopReplayRecording && !newState?.isRecording) {
       stopSessionReplay();
     }
   });
@@ -70,6 +72,7 @@
           }
         },
         maskAllInputs: true,
+        maskTextSelector: "[contenteditable], [contenteditable='true'], .bug-black-box-mask",
         blockClass: "bug-black-box-block",
         ignoreClass: "bug-black-box-ignore"
       });
