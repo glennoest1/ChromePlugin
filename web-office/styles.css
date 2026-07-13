@@ -146,6 +146,30 @@ nav {
   font-size: 14px;
 }
 
+.language-control {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.language-control select {
+  min-height: 34px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: var(--panel);
+  color: var(--ink);
+  padding: 0 10px;
+  font: inherit;
+}
+
+.language-control select:focus-visible {
+  outline: 2px solid var(--border-focus);
+  outline-offset: 2px;
+}
+
 nav a,
 .nav-actions a {
   color: inherit;

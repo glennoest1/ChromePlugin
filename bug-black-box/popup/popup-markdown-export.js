@@ -8,63 +8,70 @@ function buildMarkdown(report) {
   const networkEvents = events.filter((event) => event.type === "network" || event.type === "networkError");
   const networkErrors = networkEvents.filter((event) => event.type === "networkError" || event.error || Number(event.statusCode) >= 400);
   const rootTab = tabs.find((tab) => tab.tabId === report.rootTabId) || tabs[0] || {};
-  const title = rootTab.title || rootTab.url || report.tabTitle || report.tabUrl || "Unknown Page";
+  const title = rootTab.title || rootTab.url || report.tabTitle || report.tabUrl || mdT("unknownPage");
   const summary = report.summary || {};
   const screenshots = getReportScreenshots(report);
 
-  return `# Bug Report - ${escapeMarkdown(title)}
+  return `# ${mdT("reportTitle")} - ${escapeMarkdown(title)}
 
-**Recorded at:** ${formatDateTime(report.startedAt)}
-**Mode:** ${MODE_LABELS[normalizeMode(report.mode)] || "Current tab"}
-**Root URL:** ${rootTab.url || report.tabUrl || "Unknown"}
-**Captured tabs:** ${summary.tabCount || tabs.length}
-**Total debug events:** ${summary.totalEvents ?? events.length}
-**Total replay events:** ${summary.totalReplayEvents ?? report.replayEventCount ?? 0}
-**Recording duration:** ${report.durationSeconds || 0} seconds
+**${mdT("recordedAt")}:** ${formatDateTime(report.startedAt)}
+**${mdT("mode")}:** ${MODE_LABELS[normalizeMode(report.mode)] || bbbT("currentTab")}
+**${mdT("rootUrl")}:** ${rootTab.url || report.tabUrl || mdT("unknown")}
+**${mdT("capturedTabs")}:** ${summary.tabCount || tabs.length}
+**${mdT("totalDebugEvents")}:** ${summary.totalEvents ?? events.length}
+**${mdT("totalReplayEvents")}:** ${summary.totalReplayEvents ?? report.replayEventCount ?? 0}
+**${mdT("recordingDuration")}:** ${report.durationSeconds || 0} ${mdT("seconds")}
 
-## Captured Tabs
-${tabs.length ? tabs.map((tab, index) => `${index + 1}. ${escapeMarkdown(tab.title || "Untitled")} - ${tab.url || "Unknown"} (${(tab.events || []).length} events, ${getTabReplayEventCount(tab)} replay events)`).join("\n") : "(No tabs captured.)"}
+## ${mdT("capturedTabsHeading")}
+${tabs.length ? tabs.map((tab, index) => `${index + 1}. ${escapeMarkdown(tab.title || bbbT("untitledPage"))} - ${tab.url || mdT("unknown")} (${mdT("tabEventSummary", { events: (tab.events || []).length, replay: getTabReplayEventCount(tab) })})`).join("\n") : mdT("noTabsCapturedMd")}
 
-## Steps to Reproduce
-${steps.length ? steps.map((event, index) => `${index + 1}. [${formatTime(event.timestamp)}] ${escapeMarkdown(describeStep(event))}`).join("\n") : "(No user actions captured.)"}
+## ${mdT("stepsHeading")}
+${steps.length ? steps.map((event, index) => `${index + 1}. [${formatTime(event.timestamp)}] ${escapeMarkdown(describeStep(event))}`).join("\n") : mdT("noUserActionsMd")}
 
-## JavaScript Errors
-${errors.length ? fenced(errors.map(formatError).join("\n\n")) : "(No JavaScript errors captured.)"}
+## ${mdT("jsErrorsHeading")}
+${errors.length ? fenced(errors.map(formatError).join("\n\n")) : mdT("noJsErrorsMd")}
 
-## Console Errors
-${consoleErrors.length ? fenced(consoleErrors.map(formatConsoleEvent).join("\n")) : "(No console errors captured.)"}
+## ${mdT("consoleErrorsHeading")}
+${consoleErrors.length ? fenced(consoleErrors.map(formatConsoleEvent).join("\n")) : mdT("noConsoleErrorsMd")}
 
-## Network Errors
-${networkErrors.length ? fenced(networkErrors.map(formatNetworkError).join("\n")) : "(No failed network requests captured.)"}
+## ${mdT("networkErrorsHeading")}
+${networkErrors.length ? fenced(networkErrors.map(formatNetworkError).join("\n")) : mdT("noNetworkErrorsMd")}
 
-## Network Requests
-${networkEvents.length ? fenced(networkEvents.map(formatNetworkRequest).join("\n\n")) : "(No network requests captured.)"}
+## ${mdT("networkRequestsHeading")}
+${networkEvents.length ? fenced(networkEvents.map(formatNetworkRequest).join("\n\n")) : mdT("noNetworkRequestsMd")}
 
-## Console Log
-${consoleEvents.length ? fenced(consoleEvents.map(formatConsoleEvent).join("\n")) : "(No console logs captured.)"}
+## ${mdT("consoleLogHeading")}
+${consoleEvents.length ? fenced(consoleEvents.map(formatConsoleEvent).join("\n")) : mdT("noConsoleLogsMd")}
 
-## Screenshots
+## ${mdT("screenshotsHeading")}
 ${buildMarkdownScreenshots(report, screenshots)}
 
-## Session Replay
-${getTotalReplayEvents(report) ? `Captured ${getTotalReplayEvents(report)} replay events. Open the extension replay viewer to watch all clicked tabs or each tab separately.` : "No session replay was captured."}
+## ${mdT("sessionReplayHeading")}
+${getTotalReplayEvents(report) ? mdT("replayCapturedMd", { count: getTotalReplayEvents(report) }) : mdT("noReplayMd")}
 ${report.aiExplanation ? `
-## Plain-English Explanation
+## ${mdT("aiExplanationHeading")}
 > ${report.aiExplanation.replace(/\n/g, "\n> ")}
 ` : ""}
-## Machine-readable Report
-Download the JSON report from the extension popup to inspect the full report v2 payload, including replay events.`;
+## ${mdT("machineReadableHeading")}
+${mdT("machineReadableText")}`;
 }
 
 function buildMarkdownScreenshots(report, screenshots) {
   if (!screenshots.length) {
-    return `Screenshot unavailable${report.screenshotError ? `: ${report.screenshotError}` : "."}`;
+    return report.screenshotError
+      ? mdT("screenshotUnavailableWithReason", { reason: report.screenshotError })
+      : mdT("screenshotUnavailable");
   }
 
   return screenshots.map((screenshot, index) => {
-    const title = screenshot.title || `Tab ${screenshot.tabId || index + 1}`;
+    const title = screenshot.title || `${bbbT("tabs")} ${screenshot.tabId || index + 1}`;
     const url = screenshot.url ? `\nURL: ${screenshot.url}` : "";
     const meta = formatScreenshotMeta(screenshot);
     return `### ${escapeMarkdown(title)}${url}\n${meta}\n\n![screenshot-${index + 1}](${screenshot.dataUrl})`;
   }).join("\n\n");
+}
+
+function mdT(key, params = {}) {
+  const value = bbbT(`md_${key}`, params);
+  return value === `md_${key}` ? key : value;
 }

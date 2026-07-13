@@ -2,24 +2,25 @@ let statusTimer = null;
 let activeReport = null;
 
 const ERROR_MESSAGES = {
-  NO_ACTIVE_TAB: "Khong tim thay tab dang mo. Hay mo mot trang web binh thuong roi thu lai.",
-  RESTRICTED_PAGE: "Chrome khong cho extension ghi tren trang noi bo nhu chrome://extensions. Hay mo website thuong, localhost hoac trang demo.",
-  FILE_ACCESS_REQUIRED: "Trang file:// can bat quyen file. Vao chrome://extensions, chon Bug Black Box, bat Allow access to file URLs roi reload trang demo.",
-  INJECTION_FAILED: "Chrome da chan recorder tren trang nay. Hay reload tab hien tai roi bam Start lai, hoac thu tren localhost.",
-  UNSUPPORTED_PAGE: "Khong the ghi tren trang nay. Hay thu tren website thuong, localhost hoac trang demo.",
-  MISSING_API_KEY: "Can cau hinh Gemini API key trong Settings truoc khi dung AI Explain.",
-  INVALID_API_KEY: "API key khong hop le. Hay kiem tra lai trong Settings.",
-  NETWORK_ERROR: "Khong the ket noi toi may chu AI. Hay kiem tra ket noi mang.",
-  RATE_LIMIT: "Da vuot gioi han su dung API. Thu lai sau it phut.",
-  EMPTY_RESPONSE: "AI tra ve noi dung rong.",
-  EMPTY_REPORT: "Khong co report de giai thich.",
-  NO_ERRORS: "Report nay khong co loi JavaScript hoac console.error de giai thich.",
-  UNKNOWN_ERROR: "AI Explain bi loi. Thu lai sau."
+  NO_ACTIVE_TAB: "noActiveTab",
+  RESTRICTED_PAGE: "restrictedPage",
+  FILE_ACCESS_REQUIRED: "fileAccessRequired",
+  INJECTION_FAILED: "injectionFailed",
+  UNSUPPORTED_PAGE: "unsupportedPage",
+  MISSING_API_KEY: "missingApiKey",
+  INVALID_API_KEY: "invalidApiKey",
+  NETWORK_ERROR: "networkError",
+  RATE_LIMIT: "rateLimit",
+  EMPTY_RESPONSE: "emptyResponse",
+  EMPTY_REPORT: "emptyReport",
+  NO_ERRORS: "noErrors",
+  UNKNOWN_ERROR: "unknownAiError"
 };
 
 document.addEventListener("DOMContentLoaded", init);
 
 async function init() {
+  await bbbInitI18n();
   const status = await sendMessage({ action: "getStatus" });
   if (status?.recordingState?.isRecording) {
     renderRecording(status.recordingState, status.counts);
@@ -42,7 +43,7 @@ async function startRecording() {
   const button = document.getElementById("startButton");
   const mode = document.querySelector("input[name='recordingMode']:checked")?.value || "activeTab";
   button.disabled = true;
-  button.textContent = "Starting...";
+  button.textContent = bbbT("starting");
 
   const response = await sendMessage({ action: "startRecording", mode });
   if (!response?.ok) {
@@ -56,11 +57,11 @@ async function startRecording() {
 async function stopRecording() {
   const button = document.getElementById("stopButton");
   button.disabled = true;
-  button.textContent = "Creating report...";
+  button.textContent = bbbT("creatingReport");
 
   const response = await sendMessage({ action: "stopRecording" });
   if (!response?.ok || !response.report) {
-    renderIdle("Unable to create a report.");
+    renderIdle(bbbT("unableCreateReport"));
     return;
   }
 
@@ -77,14 +78,14 @@ async function explainWithAI() {
   const button = document.getElementById("explainButton");
   if (button) {
     button.disabled = true;
-    button.textContent = "Explaining...";
+    button.textContent = bbbT("explaining");
   }
 
   const response = await sendMessage({ action: "explainReport" });
 
   if (!response?.ok) {
     const status = await sendMessage({ action: "getStatus" });
-    renderReport(activeReport, status?.hasApiKey, ERROR_MESSAGES[response?.error] || ERROR_MESSAGES.UNKNOWN_ERROR);
+    renderReport(activeReport, status?.hasApiKey, bbbT(ERROR_MESSAGES[response?.error] || ERROR_MESSAGES.UNKNOWN_ERROR));
     attachOpenOptionsLink();
     return;
   }
@@ -109,8 +110,8 @@ function openReplayPage() {
 }
 
 function buildStartErrorMessage(response) {
-  const baseMessage = ERROR_MESSAGES[response?.error] || "Khong the bat dau recording.";
-  const tabUrl = response?.tabUrl ? `\nTab hien tai: ${response.tabUrl}` : "";
+  const baseMessage = bbbT(ERROR_MESSAGES[response?.error] || "cannotStart");
+  const tabUrl = response?.tabUrl ? `\n${bbbT("currentTabLine", { url: response.tabUrl })}` : "";
   return `${baseMessage}${tabUrl}`;
 }
 

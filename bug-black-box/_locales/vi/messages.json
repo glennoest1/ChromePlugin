@@ -1,0 +1,8 @@
+{
+  "extName": {
+    "message": "Bug Black Box"
+  },
+  "extDescription": {
+    "message": "Ghi console log, loi JavaScript, thao tac nguoi dung, request loi, anh chup man hinh va replay thanh bug report."
+  }
+}

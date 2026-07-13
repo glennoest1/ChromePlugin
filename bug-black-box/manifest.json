@@ -1,9 +1,10 @@
 {
   "manifest_version": 3,
-  "name": "Bug Black Box",
+  "name": "__MSG_extName__",
   "version": "1.0.0",
+  "default_locale": "en",
   "minimum_chrome_version": "111",
-  "description": "Record console logs, JavaScript errors, user actions, failed requests, screenshots, and replay into bug reports.",
+  "description": "__MSG_extDescription__",
   "permissions": [
     "storage",
     "activeTab",
@@ -20,6 +21,7 @@
     "service_worker": "background.js"
   },
   "action": {
+    "default_title": "__MSG_extName__",
     "default_popup": "popup/popup.html",
     "default_icon": {
       "16": "icons/icon16.png",
