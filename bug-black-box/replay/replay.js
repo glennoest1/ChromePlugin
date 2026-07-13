@@ -1,6 +1,8 @@
 document.addEventListener("DOMContentLoaded", init);
 
 async function init() {
+  await bbbInitI18n();
+  renderReplayChrome();
   const response = await chrome.runtime.sendMessage({ action: "getReplayEvents" }).catch(() => null);
   replayTabs = response?.replayTabs || [];
   replayEventsByTab = response?.replayEventsByTab || {};
@@ -9,7 +11,7 @@ async function init() {
   selectedTabId = response?.selectedTabId ?? replayTabs[0]?.tabId ?? null;
 
   if (!window.rrwebPlayer || !replayTabs.length) {
-    showEmpty("No replay is available for the latest report.");
+    showEmpty(bbbT("noReplayLatest"));
     return;
   }
 
@@ -23,6 +25,21 @@ async function init() {
   }
 
   window.addEventListener("resize", resizePlayer);
+}
+
+function renderReplayChrome() {
+  document.title = `${bbbT("replayTitle")} - Bug Black Box`;
+  replayTitle.textContent = bbbT("replayTitle");
+  meta.textContent = bbbT("loadingReplay");
+  replayTabLabel.textContent = bbbT("replayTab");
+  eventsLabel.textContent = bbbT("events");
+  durationLabel.textContent = bbbT("duration");
+  emptyState.textContent = bbbT("noReplayData");
+  playButton.textContent = bbbT("play");
+  restartButton.textContent = bbbT("restart");
+  speedLabel.textContent = bbbT("speed");
+  document.getElementById("languageSlot").innerHTML = bbbRenderLanguageSelect();
+  bbbWireLanguageSelect();
 }
 
 async function loadSelectedTab(tabId) {
@@ -40,7 +57,7 @@ async function loadSelectedTab(tabId) {
   const selectedTab = (response?.replayTabs || replayTabs).find((tab) => tab.tabId === tabId) || {};
 
   if (events.length < 2) {
-    showEmpty("Replay data is incomplete for this tab.");
+    showEmpty(bbbT("incompleteReplay"));
     return;
   }
 
@@ -49,7 +66,7 @@ async function loadSelectedTab(tabId) {
   totalDuration = Math.max(0, events[events.length - 1].timestamp - events[0].timestamp);
   replayShell.hidden = false;
   emptyState.hidden = true;
-  meta.textContent = `${selectedTab.title || selectedTab.url || "Selected tab"} replay.`;
+  meta.textContent = bbbT("selectedTabReplay", { title: selectedTab.title || selectedTab.url || bbbT("selectedTab") });
   eventCount.textContent = String(events.length);
   duration.textContent = formatDuration(totalDuration);
   totalTime.textContent = formatDuration(totalDuration);
@@ -77,7 +94,7 @@ async function loadAllTabsTimeline(offset = 0) {
   totalDuration = Math.max(0, lastSegment.end - firstSegment.start);
   replayShell.hidden = false;
   emptyState.hidden = true;
-  meta.textContent = `${timelineSegments.length} tab segments in one timeline.`;
+  meta.textContent = bbbT("timelineSegments", { count: timelineSegments.length });
   eventCount.textContent = String(Object.values(replayEventsByTab).reduce((total, events) =>
     total + (Array.isArray(events) ? events.length : 0), 0));
   duration.textContent = formatDuration(totalDuration);

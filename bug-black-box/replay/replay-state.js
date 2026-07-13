@@ -14,6 +14,11 @@ const seekRange = document.getElementById("seekRange");
 const currentTime = document.getElementById("currentTime");
 const totalTime = document.getElementById("totalTime");
 const speedSelect = document.getElementById("speedSelect");
+const replayTitle = document.getElementById("replayTitle");
+const replayTabLabel = document.getElementById("replayTabLabel");
+const eventsLabel = document.getElementById("eventsLabel");
+const durationLabel = document.getElementById("durationLabel");
+const speedLabel = document.getElementById("speedLabel");
 
 let player = null;
 let replayTabs = [];
