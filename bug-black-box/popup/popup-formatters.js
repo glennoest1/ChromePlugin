@@ -1,8 +1,12 @@
 var PREVIEW_TEXT_LIMIT = 1600;
-var MODE_LABELS = {
-  activeTab: "Current tab",
-  allTabs: "All tabs"
-};
+var MODE_LABELS = {};
+
+function updateModeLabels() {
+  MODE_LABELS.activeTab = bbbT("currentTab");
+  MODE_LABELS.allTabs = bbbT("allTabs");
+}
+
+document.addEventListener("bbb-language-ready", updateModeLabels);
 
 function getReplayStatusText(report) {
   const replayEventCount = getTotalReplayEvents(report);
@@ -11,16 +15,16 @@ function getReplayStatusText(report) {
     : getReportTabs(report).filter((tab) => getTabReplayEventCount(tab) > 0).length;
   if (replayEventCount) {
     return replayTabCount > 1
-      ? `${replayEventCount} events captured across ${replayTabCount} tabs`
-      : `${replayEventCount} events captured`;
+      ? `${replayEventCount} ${bbbT("replayEvents").toLowerCase()} / ${replayTabCount} ${bbbT("tabs").toLowerCase()}`
+      : `${replayEventCount} ${bbbT("replayEvents").toLowerCase()}`;
   }
 
   const status = report.replayStatus || {};
-  if (status.storageError) return `not captured (${status.storageError})`;
-  if (status.startError) return `not captured (${status.startError})`;
-  if (status.started === false) return "not captured (recorder did not start)";
-  if (status.lastBatchAt && !replayEventCount) return "not captured (storage saved 0 events)";
-  return "not captured";
+  if (status.storageError) return bbbT("notCapturedWithReason", { reason: status.storageError });
+  if (status.startError) return bbbT("notCapturedWithReason", { reason: status.startError });
+  if (status.started === false) return bbbT("notCapturedRecorder");
+  if (status.lastBatchAt && !replayEventCount) return bbbT("notCapturedZero");
+  return bbbT("notCaptured");
 }
 
 function countEvents(events = []) {
@@ -48,9 +52,9 @@ function normalizeMode(mode) {
 }
 
 function describeStep(event) {
-  const verb = event.type === "submit" ? "Submit form" : "Click";
-  const target = event.text || event.selector || "unknown element";
-  return `${verb} "${target}" (selector: ${event.selector || "unknown"})`;
+  const verb = event.type === "submit" ? bbbT("submit") : bbbT("click");
+  const target = event.text || event.selector || bbbT("unknownElement");
+  return `${verb} "${target}" (selector: ${event.selector || bbbT("unknownElement")})`;
 }
 
 function formatError(event) {
@@ -127,17 +131,17 @@ function fenced(text) {
 
 function formatScreenshotMeta(screenshot) {
   const reason = screenshot.reason === "error"
-    ? `Captured at ${formatScreenshotReason(screenshot.severity || screenshot.eventType)}`
+    ? bbbT("capturedAtError", { reason: formatScreenshotReason(screenshot.severity || screenshot.eventType) })
     : screenshot.reason === "stopFallback"
-      ? "Captured when recording stopped"
-      : "Captured during recording";
+      ? bbbT("capturedOnStop")
+      : bbbT("capturedDuring");
   const time = screenshot.capturedAt ? ` - ${formatTime(screenshot.capturedAt)}` : "";
   return `${reason}${time}`;
 }
 
 function formatScreenshotReason(reason) {
-  if (reason === "jsError") return "JavaScript error";
-  if (reason === "consoleError") return "console error";
-  if (reason === "networkError") return "network error";
-  return "error";
+  if (reason === "jsError") return bbbT("javascriptError");
+  if (reason === "consoleError") return bbbT("consoleError");
+  if (reason === "networkError") return bbbT("networkErrorReason");
+  return bbbT("error");
 }

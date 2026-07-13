@@ -11,23 +11,24 @@
   <main class="page">
     <header class="topbar">
       <div>
-        <h1>Session Replay</h1>
+        <h1 id="replayTitle">Session Replay</h1>
         <p id="meta" class="muted">Loading replay...</p>
       </div>
       <label class="tab-control" for="tabSelect">
-        <span>Replay tab</span>
+        <span id="replayTabLabel">Replay tab</span>
         <select id="tabSelect"></select>
       </label>
       <div class="summary">
         <div>
-          <span>Events</span>
+          <span id="eventsLabel">Events</span>
           <strong id="eventCount">0</strong>
         </div>
         <div>
-          <span>Duration</span>
+          <span id="durationLabel">Duration</span>
           <strong id="duration">00:00</strong>
         </div>
       </div>
+      <div id="languageSlot"></div>
     </header>
 
     <section id="emptyState" class="empty" hidden>No session replay data found.</section>
@@ -48,7 +49,7 @@
         </div>
 
         <label class="speed-control" for="speedSelect">
-          <span>Speed</span>
+          <span id="speedLabel">Speed</span>
           <select id="speedSelect">
             <option value="1">1x</option>
             <option value="2">2x</option>
@@ -61,6 +62,7 @@
   </main>
   <script src="../vendor/rrweb-player.min.js"></script>
   <script src="../shared/dom.js"></script>
+  <script src="../shared/i18n.js"></script>
   <script src="replay-state.js"></script>
   <script src="replay-timeline.js"></script>
   <script src="replay-ui.js"></script>

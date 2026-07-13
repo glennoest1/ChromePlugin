@@ -153,6 +153,33 @@ h1::before {
   box-shadow: 0 0 0 3px var(--accent-glow);
 }
 
+.language-control {
+  display: grid;
+  gap: 4px;
+  color: var(--text-3);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+
+.language-control select {
+  min-height: 38px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  color: var(--text);
+  padding: 0 10px;
+  font: inherit;
+  font-size: 13px;
+  outline: none;
+}
+
+.language-control select:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-glow);
+}
+
 /* ── Empty state ── */
 .empty {
   border: 1px solid var(--border);

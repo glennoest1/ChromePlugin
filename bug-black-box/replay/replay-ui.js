@@ -3,12 +3,12 @@ function renderTabOptions() {
   if (timelineSegments.length > 1) {
     const totalEvents = Object.values(replayEventsByTab).reduce((total, events) =>
       total + (Array.isArray(events) ? events.length : 0), 0);
-    options.push(`<option value="${ALL_TABS_VALUE}">All clicked tabs (${totalEvents} events)</option>`);
+    options.push(`<option value="${ALL_TABS_VALUE}">${escapeHtml(bbbT("allClickedTabs", { count: totalEvents }))}</option>`);
   }
 
   options.push(...replayTabs.map((tab) => {
     const title = tab.title || tab.url || `Tab ${tab.tabId}`;
-    return `<option value="${escapeHtml(tab.tabId)}">${escapeHtml(title)} (${tab.eventCount} events)</option>`;
+    return `<option value="${escapeHtml(tab.tabId)}">${escapeHtml(title)} (${tab.eventCount} ${escapeHtml(bbbT("events").toLowerCase())})</option>`;
   }));
 
   tabSelect.innerHTML = options.join("");
@@ -64,7 +64,7 @@ function showEmpty(message) {
 
 function setPlayingState(nextIsPlaying) {
   isPlaying = nextIsPlaying;
-  playButton.textContent = isPlaying ? "Pause" : "Play";
+  playButton.textContent = isPlaying ? bbbT("pause") : bbbT("play");
   playButton.classList.toggle("primary", !isPlaying);
 }
 

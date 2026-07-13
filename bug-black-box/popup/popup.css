@@ -154,6 +154,39 @@ body {
   gap: 8px;
 }
 
+.header-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.language-control {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.language-control span {
+  max-width: 54px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.language-control select {
+  width: 78px;
+  height: 30px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text-2);
+  font: 600 11px -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+}
+
 h1 {
   font-size: 16px;
   font-weight: 800;

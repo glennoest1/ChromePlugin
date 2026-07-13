@@ -14,18 +14,20 @@
     </div>
 
     <section class="panel">
+      <div id="languageSlot"></div>
+
       <div>
-        <p class="panel-title">Gemini API Key</p>
-        <p class="panel-desc">Lưu API key Gemini tại đây để bật tính năng AI Explain. Key được lưu cục bộ trên trình duyệt của bạn, không gửi đi đâu.</p>
+        <p class="panel-title" id="apiKeyTitle">Gemini API Key</p>
+        <p class="panel-desc" id="apiKeyDesc">Save your Gemini API key here to enable AI Explain. The key is stored locally in your browser and is not sent anywhere else.</p>
       </div>
 
       <hr class="divider">
 
       <div>
-        <label class="field-label" for="apiKey">API Key</label>
+        <label class="field-label" for="apiKey" id="apiKeyLabel">API Key</label>
         <div class="input-wrap">
           <input id="apiKey" type="password" autocomplete="off" spellcheck="false" placeholder="AIza...">
-          <button type="button" class="toggle-password" id="togglePassword" title="Show / Hide key" aria-label="Toggle key visibility">👁</button>
+          <button type="button" class="toggle-password" id="togglePassword" title="Show / Hide key" aria-label="Show / Hide key">Show</button>
         </div>
       </div>
 
@@ -36,17 +38,18 @@
 
       <p id="status" class="status" role="status"></p>
 
-      <p class="info-footer">🔒 Key được lưu trong <code>chrome.storage.local</code> và chỉ được dùng để gọi Gemini API.</p>
+      <p class="info-footer" id="keyFooter">Key is stored in <code>chrome.storage.local</code> and is only used to call the Gemini API.</p>
     </section>
   </main>
+  <script src="../shared/dom.js"></script>
+  <script src="../shared/i18n.js"></script>
   <script src="options.js"></script>
   <script>
-    // Toggle password visibility
-    document.getElementById('togglePassword').addEventListener('click', function() {
-      const input = document.getElementById('apiKey');
-      const isPassword = input.type === 'password';
-      input.type = isPassword ? 'text' : 'password';
-      this.textContent = isPassword ? '🙈' : '👁';
+    document.getElementById("togglePassword").addEventListener("click", function() {
+      const input = document.getElementById("apiKey");
+      const isPassword = input.type === "password";
+      input.type = isPassword ? "text" : "password";
+      this.textContent = isPassword ? bbbT("hideKey") : bbbT("showKey");
     });
   </script>
 </body>

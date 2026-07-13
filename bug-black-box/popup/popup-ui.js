@@ -17,9 +17,9 @@ function mkMetric(icon, value, label) {
 
 function renderIssueSummary(jsErrors, consoleErrors, networkErrors) {
   const parts = [
-    jsErrors.length ? `${jsErrors.length} JS error${jsErrors.length > 1 ? "s" : ""}` : "",
-    consoleErrors.length ? `${consoleErrors.length} console error${consoleErrors.length > 1 ? "s" : ""}` : "",
-    networkErrors.length ? `${networkErrors.length} failed request${networkErrors.length > 1 ? "s" : ""}` : ""
+    jsErrors.length ? bbbT("jsErrors", { count: jsErrors.length }) : "",
+    consoleErrors.length ? bbbT("consoleErrors", { count: consoleErrors.length }) : "",
+    networkErrors.length ? bbbT("failedRequests", { count: networkErrors.length }) : ""
   ].filter(Boolean);
   return parts.join(" \u00b7 ");
 }
@@ -37,32 +37,40 @@ function renderIdle(message = "") {
     <section class="panel">
       <div class="header">
         <h1>Bug Black Box</h1>
-        <button class="icon-button" id="settingsButton" title="Settings" aria-label="Settings">&#9881;</button>
+        <div class="header-actions">
+          ${bbbRenderLanguageSelect()}
+          <button class="icon-button" id="settingsButton" title="${escapeHtml(bbbT("settings"))}" aria-label="${escapeHtml(bbbT("settings"))}">&#9881;</button>
+        </div>
       </div>
       <p class="muted">Ghi thao tác, console log, lỗi JS, screenshot và failed request thành bug report có cấu trúc.</p>
       ${message ? `<div class="error">${escapeHtml(message)}</div>` : ""}
       <div class="notice">Không bấm Start khi đang ở trang <strong>chrome://</strong>. Với file local, bật quyền file URL cho extension.</div>
-      <div class="mode-picker" role="radiogroup" aria-label="Recording mode">
+      <div class="mode-picker" role="radiogroup" aria-label="${escapeHtml(bbbT("recordingMode"))}">
         <label>
           <input type="radio" name="recordingMode" value="activeTab" checked>
-          <span>Current tab</span>
+          <span>${escapeHtml(bbbT("currentTab"))}</span>
         </label>
         <label>
           <input type="radio" name="recordingMode" value="allTabs">
-          <span>All tabs</span>
+          <span>${escapeHtml(bbbT("allTabs"))}</span>
         </label>
       </div>
       <button class="button button-record" id="startButton">
         <svg width="10" height="10" viewBox="0 0 10 10" aria-hidden="true"><circle cx="5" cy="5" r="4.5" fill="currentColor"/></svg>
-        Start Recording
+        ${escapeHtml(bbbT("startRecording"))}
       </button>
-      <p class="privacy-note">&#128274; No passwords &middot; No cookies &middot; No request bodies</p>
+      <p class="privacy-note">${escapeHtml(bbbT("privacyNote"))}</p>
       ${getExampleReportHtml()}
     </section>
   `;
 
+  const summaryText = document.querySelector(".panel > .muted");
+  const noticeText = document.querySelector(".panel > .notice");
+  if (summaryText) summaryText.textContent = bbbT("appSummary");
+  if (noticeText) noticeText.textContent = bbbT("startNotice");
   document.getElementById("startButton").addEventListener("click", startRecording);
   document.getElementById("settingsButton").addEventListener("click", openOptions);
+  bbbWireLanguageSelect();
 }
 
 // ── Recording state ───────────────────────────────────────────────────
@@ -76,22 +84,22 @@ function renderRecording(recordingState, counts = {}) {
     <section class="panel">
       <div class="rec-banner">
         <span class="record-dot" aria-hidden="true"></span>
-        <span class="rec-label">Recording</span>
+        <span class="rec-label">${escapeHtml(bbbT("recording"))}</span>
         <span id="timer" class="rec-timer">${formatDuration(recordingState.startedAt)}</span>
         <span class="rec-mode">${escapeHtml(MODE_LABELS[mode])}</span>
       </div>
       <div class="stats">
-        ${stat(counts.console || 0, "Logs")}
-        ${stat((counts.jsError || 0) + (counts.consoleError || 0), "Errors")}
-        ${stat((counts.click || 0) + (counts.submit || 0), "Actions")}
-        ${stat((counts.network || 0) + (counts.networkError || 0), "Network")}
+        ${stat(counts.console || 0, bbbT("logs"))}
+        ${stat((counts.jsError || 0) + (counts.consoleError || 0), bbbT("errors"))}
+        ${stat((counts.click || 0) + (counts.submit || 0), bbbT("actions"))}
+        ${stat((counts.network || 0) + (counts.networkError || 0), bbbT("network"))}
       </div>
       <div id="recordingTabList">${mode === "allTabs" ? renderTabList(tabs) : ""}</div>
       <button class="button button-stop" id="stopButton">
         <svg width="10" height="10" viewBox="0 0 10 10" aria-hidden="true"><rect x="1.5" y="1.5" width="7" height="7" rx="1" fill="currentColor"/></svg>
-        Stop &amp; Create Report
+        ${escapeHtml(bbbT("stopCreateReport"))}
       </button>
-      <p class="muted" style="font-size:11px;color:var(--muted);text-align:center;">Keep the target tab open until screenshot is captured.</p>
+      <p class="muted" style="font-size:11px;color:var(--muted);text-align:center;">${escapeHtml(bbbT("keepTargetOpen"))}</p>
       ${getExampleReportHtml()}
     </section>
   `;
@@ -154,34 +162,37 @@ function renderReport(report, hasApiKey = false, aiMessage = "") {
 
   // Build tab definitions
   const reportTabs = [
-    { id: "steps", label: "Steps", count: steps.length, cls: "" },
-    ...(allErrors.length ? [{ id: "errors", label: "Errors", count: allErrors.length, cls: "badge-red" }] : []),
-    ...(networkErrors.length ? [{ id: "network", label: "Network", count: networkErrors.length, cls: "badge-red" }] : []),
-    ...(showExplain ? [{ id: "ai", label: "AI \u2736" }] : []),
+    { id: "steps", label: bbbT("steps"), count: steps.length, cls: "" },
+    ...(allErrors.length ? [{ id: "errors", label: bbbT("errors"), count: allErrors.length, cls: "badge-red" }] : []),
+    ...(networkErrors.length ? [{ id: "network", label: bbbT("network"), count: networkErrors.length, cls: "badge-red" }] : []),
+    ...(showExplain ? [{ id: "ai", label: bbbT("ai") }] : []),
     ...(screenshots.length ? [{ id: "media", label: "\u{1F4F7}\u00a0" + screenshots.length }] : []),
-    ...(tabs.length > 1 ? [{ id: "tabs", label: "Tabs (" + tabs.length + ")" }] : []),
+    ...(tabs.length > 1 ? [{ id: "tabs", label: bbbT("tabs") + " (" + tabs.length + ")" }] : []),
   ];
 
   // Page info
   const isMulti = tabs.length > 1;
-  const pageTitle = isMulti ? `Multi-tab Recording (${tabs.length} tabs)` : (rootTab.title || "Untitled page");
+  const pageTitle = isMulti ? bbbT("multiTabRecording", { count: tabs.length }) : (rootTab.title || bbbT("untitledPage"));
   const pageUrl = rootTab.url || report.tabUrl || "";
   const urlDisplay = pageUrl.replace(/^https?:\/\//, "");
-  const urlText = isMulti ? `Started from: ${urlDisplay}` : urlDisplay;
+  const urlText = isMulti ? bbbT("startedFrom", { url: urlDisplay }) : urlDisplay;
   const hasIssues = hasErrors || networkErrors.length > 0;
   const heroClass = hasIssues ? "rh-error" : "rh-success";
   const heroIcon = hasIssues ? "\u26a0" : "\u2713";
   const heroText = hasIssues
     ? renderIssueSummary(jsErrors, consoleErrors, networkErrors)
-    : "No blocking errors found";
+    : bbbT("noBlockingErrors");
 
   getPopupApp().innerHTML = `
     <div class="report-shell">
 
       <div class="report-top">
         <div class="header">
-          <h1>Report Ready</h1>
-          <button class="icon-button" id="settingsButton" title="Settings" aria-label="Settings">&#9881;</button>
+          <h1>${escapeHtml(bbbT("reportReady"))}</h1>
+          <div class="header-actions">
+            ${bbbRenderLanguageSelect()}
+            <button class="icon-button" id="settingsButton" title="${escapeHtml(bbbT("settings"))}" aria-label="${escapeHtml(bbbT("settings"))}">&#9881;</button>
+          </div>
         </div>
 
         <div class="report-hero-compact ${heroClass}">
@@ -190,18 +201,18 @@ function renderReport(report, hasApiKey = false, aiMessage = "") {
         </div>
 
         <div class="metrics-row">
-          ${mkMetric("\u23f1", (report.durationSeconds || 0) + "s", "Duration")}
-          ${mkMetric("\u26a1", steps.length, "Actions")}
-          ${mkMetric("\ud83d\udccc", counts.console || 0, "Logs")}
-          ${mkMetric("\ud83c\udf10", networkEvents.length, "Network")}
-          ${mkMetric("\ud83d\uddc2", tabs.length, "Tabs")}
-          ${mkMetric("\u25b6", replayEventCount, "Replay events")}
+          ${mkMetric("\u23f1", (report.durationSeconds || 0) + "s", bbbT("duration"))}
+          ${mkMetric("\u26a1", steps.length, bbbT("actions"))}
+          ${mkMetric("\ud83d\udccc", counts.console || 0, bbbT("logs"))}
+          ${mkMetric("\ud83c\udf10", networkEvents.length, bbbT("network"))}
+          ${mkMetric("\ud83d\uddc2", tabs.length, bbbT("tabs"))}
+          ${mkMetric("\u25b6", replayEventCount, bbbT("replayEvents"))}
         </div>
 
         <div class="page-meta">
-          <div class="pm-title" title="${escapeHtml(rootTab.title || "Untitled page")}">${escapeHtml(pageTitle)}</div>
+          <div class="pm-title" title="${escapeHtml(rootTab.title || bbbT("untitledPage"))}">${escapeHtml(pageTitle)}</div>
           <div class="pm-url"   title="${escapeHtml(pageUrl)}">${escapeHtml(urlText)}</div>
-          <div class="pm-sub">${escapeHtml(MODE_LABELS[normalizeMode(report.mode)] || "Current tab")} &middot; ${escapeHtml(replayStatusText)}</div>
+          <div class="pm-sub">${escapeHtml(MODE_LABELS[normalizeMode(report.mode)] || bbbT("currentTab"))} &middot; ${escapeHtml(replayStatusText)}</div>
         </div>
 
         <nav class="tabs-nav" id="tabsNav" role="tablist">
@@ -217,10 +228,10 @@ function renderReport(report, hasApiKey = false, aiMessage = "") {
       <div class="tab-body" id="tabBody" role="tabpanel"></div>
 
       <div class="report-actions">
-        ${replayEventCount ? `<button class="ra-btn ra-replay" id="replayButton">\u25b6 Replay</button>` : ""}
+        ${replayEventCount ? `<button class="ra-btn ra-replay" id="replayButton">\u25b6 ${escapeHtml(bbbT("replay"))}</button>` : ""}
         <button class="ra-btn ra-dl" id="downloadButton">\u2193 .md</button>
         <button class="ra-btn ra-dl" id="downloadJsonButton">\u2193 .json</button>
-        <button class="ra-btn ra-clear" id="resetButton">\u00d7 Clear</button>
+        <button class="ra-btn ra-clear" id="resetButton">\u00d7 ${escapeHtml(bbbT("clear"))}</button>
       </div>
     </div>
   `;
@@ -246,6 +257,7 @@ function renderReport(report, hasApiKey = false, aiMessage = "") {
 
   // Wire buttons
   document.getElementById("settingsButton").addEventListener("click", openOptions);
+  bbbWireLanguageSelect();
   document.getElementById("downloadButton").addEventListener("click", () => downloadReport(activeReport));
   document.getElementById("downloadJsonButton").addEventListener("click", () => downloadJsonReport(activeReport));
   document.getElementById("resetButton").addEventListener("click", resetReport);
@@ -276,7 +288,7 @@ function renderTabContent(tabId) {
 // ── Tab content builders ──────────────────────────────────────────────
 
 function buildStepsTab(steps, pageIndex = 0) {
-  if (!steps.length) return `<p class="empty-msg">No user actions captured.</p>`;
+  if (!steps.length) return `<p class="empty-msg">${escapeHtml(bbbT("noUserActions"))}</p>`;
 
   const PAGE_SIZE = 8;
   const totalPages = Math.ceil(steps.length / PAGE_SIZE);
@@ -286,7 +298,7 @@ function buildStepsTab(steps, pageIndex = 0) {
   const rows = shown.map((step, i) => {
     const globalIndex = start + i + 1;
     const isSubmit = step.type === "submit";
-    const verb = isSubmit ? "Submit" : "Click";
+    const verb = isSubmit ? bbbT("submit") : bbbT("click");
     const raw = String(step.text || "").replace(/\s+/g, " ").trim();
     // Prefer clean text label, fall back to selector
     const label = raw && raw.length > 0 ? raw : "";
@@ -331,9 +343,9 @@ function buildStepsTab(steps, pageIndex = 0) {
 
     paginationHtml = `
       <div class="steps-pagination">
-        <button class="icon-button sp-prev" ${pageIndex === 0 ? "disabled" : ""} title="Previous">&lsaquo;</button>
+        <button class="icon-button sp-prev" ${pageIndex === 0 ? "disabled" : ""} title="${escapeHtml(bbbT("previous"))}">&lsaquo;</button>
         ${pageButtons}
-        <button class="icon-button sp-next" ${pageIndex === totalPages - 1 ? "disabled" : ""} title="Next">&rsaquo;</button>
+        <button class="icon-button sp-next" ${pageIndex === totalPages - 1 ? "disabled" : ""} title="${escapeHtml(bbbT("next"))}">&rsaquo;</button>
       </div>
     `;
   }
@@ -380,7 +392,7 @@ function attachStepsPagination() {
 }
 
 function buildErrorsTab(allErrors) {
-  if (!allErrors.length) return `<p class="empty-msg">No errors captured.</p>`;
+  if (!allErrors.length) return `<p class="empty-msg">${escapeHtml(bbbT("noErrorsCaptured"))}</p>`;
 
   return allErrors.map((err, i) => {
     const isJs = err._kind === "js";
@@ -424,7 +436,7 @@ function attachErrorToggles() {
 }
 
 function buildNetworkTab(networkErrors) {
-  if (!networkErrors.length) return `<p class="empty-msg">No network errors.</p>`;
+  if (!networkErrors.length) return `<p class="empty-msg">${escapeHtml(bbbT("noNetworkErrors"))}</p>`;
 
   return networkErrors.map(err => {
     const method = err.method || "GET";
@@ -446,7 +458,7 @@ function buildAiTab(report, hasApiKey, aiMessage) {
   if (report.aiExplanation) {
     return `
       <div class="ai-card ai-card-done">
-        <h3>AI Explanation</h3>
+        <h3>${escapeHtml(bbbT("aiExplanation"))}</h3>
         <p>${escapeHtml(report.aiExplanation)}</p>
       </div>`;
   }
@@ -455,13 +467,13 @@ function buildAiTab(report, hasApiKey, aiMessage) {
       <div class="ai-header">
         <span class="ai-icon">&#10022;</span>
         <div>
-          <div class="ai-title">Explain with Gemini</div>
+          <div class="ai-title">${escapeHtml(bbbT("explainWithGemini"))}</div>
           <div class="ai-sub">Phân tích lỗi và đề xuất hướng sửa bằng AI</div>
         </div>
       </div>
       ${aiMessage ? `<div class="ai-error">${escapeHtml(aiMessage)}</div>` : ""}
-      <button class="button button-ai" id="explainButton">Explain with AI</button>
-      ${!hasApiKey ? `<p class="ai-note">No API key saved. <button class="link-btn" id="openOptionsLink">Open Settings &rarr;</button></p>` : ""}
+      <button class="button button-ai" id="explainButton">${escapeHtml(bbbT("explainWithAI"))}</button>
+      ${!hasApiKey ? `<p class="ai-note">${escapeHtml(bbbT("noApiKeyOpenSettings"))} <button class="link-btn" id="openOptionsLink">${escapeHtml(bbbT("openSettings"))}</button></p>` : ""}
     </div>`;
 }
 
@@ -472,28 +484,28 @@ function attachExplainBtn() {
 }
 
 function buildMediaTab(screenshots) {
-  if (!screenshots.length) return `<p class="empty-msg">No screenshots captured.</p>`;
+  if (!screenshots.length) return `<p class="empty-msg">${escapeHtml(bbbT("noScreenshots"))}</p>`;
   return screenshots.map((s, i) => `
     <div class="media-card">
       <img class="media-img" src="${s.dataUrl}" alt="Screenshot ${i + 1}" loading="lazy">
       <div class="media-info">
-        <div class="mi-title">${escapeHtml(s.title || "Tab " + (s.tabId || i + 1))}</div>
+        <div class="mi-title">${escapeHtml(s.title || bbbT("tabs") + " " + (s.tabId || i + 1))}</div>
         <div class="mi-meta">${escapeHtml(formatScreenshotMeta(s))}</div>
       </div>
     </div>`).join("");
 }
 
 function buildTabsListTab(tabs) {
-  if (!tabs.length) return `<p class="empty-msg">No tabs captured.</p>`;
+  if (!tabs.length) return `<p class="empty-msg">${escapeHtml(bbbT("noTabsCaptured"))}</p>`;
   return tabs.map(tab => {
     const events = Array.isArray(tab.events) ? tab.events.length : "?";
     const replay = getTabReplayEventCount(tab);
     const url = (tab.url || "").replace(/^https?:\/\//, "");
     return `
       <div class="tlist-row">
-        <div class="tlr-title">${escapeHtml(tab.title || "Untitled")}</div>
+        <div class="tlr-title">${escapeHtml(tab.title || bbbT("untitledPage"))}</div>
         <div class="tlr-url">${escapeHtml(truncStr(url, 44))}</div>
-        <div class="tlr-counts">${events} events &middot; ${replay} replay</div>
+        <div class="tlr-counts">${escapeHtml(bbbT("eventsReplay", { events, replay }))}</div>
       </div>`;
   }).join("");
 }
@@ -501,14 +513,14 @@ function buildTabsListTab(tabs) {
 // ── Shared helpers ─────────────────────────────────────────────────────
 
 function renderTabList(tabs) {
-  if (!tabs.length) return `<p class="muted" style="font-size:11px">No tabs captured yet.</p>`;
+  if (!tabs.length) return `<p class="muted" style="font-size:11px">${escapeHtml(bbbT("noTabsYet"))}</p>`;
   return `
     <ul class="tab-list">
       ${tabs.map(tab => `
         <li>
-          <strong>${escapeHtml(tab.title || "Untitled")}</strong>
-          <span>${escapeHtml(tab.url || "Unknown URL")}</span>
-          ${Array.isArray(tab.events) ? `<em>${tab.events.length} events, ${getTabReplayEventCount(tab)} replay</em>` : ""}
+          <strong>${escapeHtml(tab.title || bbbT("untitledPage"))}</strong>
+          <span>${escapeHtml(tab.url || bbbT("unknownUrl"))}</span>
+          ${Array.isArray(tab.events) ? `<em>${escapeHtml(bbbT("eventsReplay", { events: tab.events.length, replay: getTabReplayEventCount(tab) }))}</em>` : ""}
         </li>`).join("")}
     </ul>`;
 }
@@ -558,6 +570,73 @@ function getExampleReportHtml() {
           <span class="eba-btn eba-dl">↓ .md</span>
           <span class="eba-btn eba-dl">↓ .json</span>
           <span class="eba-btn eba-clear">× Clear</span>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function buildAiTab(report, hasApiKey, aiMessage) {
+  const explanationLanguage = bbbNormalizeLanguage(report.aiExplanationLanguage || "vi");
+  const currentLanguage = bbbNormalizeLanguage(bbbCurrentLanguage);
+
+  if (report.aiExplanation && explanationLanguage === currentLanguage) {
+    return `
+      <div class="ai-card ai-card-done">
+        <h3>${escapeHtml(bbbT("aiExplanation"))}</h3>
+        <p>${escapeHtml(report.aiExplanation)}</p>
+      </div>`;
+  }
+
+  return `
+    <div class="ai-card">
+      <div class="ai-header">
+        <span class="ai-icon">&#10022;</span>
+        <div>
+          <div class="ai-title">${escapeHtml(bbbT("explainWithGemini"))}</div>
+          <div class="ai-sub">${escapeHtml(bbbT("aiSub"))}</div>
+        </div>
+      </div>
+      ${aiMessage ? `<div class="ai-error">${escapeHtml(aiMessage)}</div>` : ""}
+      <button class="button button-ai" id="explainButton">${escapeHtml(bbbT("explainWithAI"))}</button>
+      ${!hasApiKey ? `<p class="ai-note">${escapeHtml(bbbT("noApiKeyOpenSettings"))} <button class="link-btn" id="openOptionsLink">${escapeHtml(bbbT("openSettings"))}</button></p>` : ""}
+    </div>`;
+}
+
+function getExampleReportHtml() {
+  return `
+    <div class="example-box">
+      <div class="eb-title">${escapeHtml(bbbT("reportExample"))}</div>
+      <div class="eb-mock">
+        <div class="eb-hero"><span>&#10003;</span> ${escapeHtml(bbbT("noBlockingErrors"))}</div>
+        <div class="eb-metrics">
+          <div class="eb-metric">&#9201; 14s</div>
+          <div class="eb-metric">&#9889; 20</div>
+          <div class="eb-metric">&#128204; 2</div>
+          <div class="eb-metric">&#9654; 121</div>
+        </div>
+        <div class="eb-meta">
+          <div class="eb-m-title">${escapeHtml(bbbT("multiTabRecording", { count: 4 }))}</div>
+          <div class="eb-m-url">${escapeHtml(bbbT("startedFrom", { url: "127.0.0.1:8080/test-page.html" }))}</div>
+        </div>
+        <div class="eb-tabs">
+          <span class="eb-tab active">${escapeHtml(bbbT("steps"))} <span class="eb-badge">20</span></span>
+          <span class="eb-tab">${escapeHtml(bbbT("errors"))} <span class="eb-badge" style="background:var(--red-soft);color:var(--red-dark);">0</span></span>
+          <span class="eb-tab">${escapeHtml(bbbT("network"))}</span>
+          <span class="eb-tab">${escapeHtml(bbbT("ai"))}</span>
+          <span class="eb-tab">&#128247; 2</span>
+          <span class="eb-tab">${escapeHtml(bbbT("tabs"))} (4)</span>
+        </div>
+        <div class="eb-step">
+          <span class="eb-num">1</span>
+          <span class="eb-verb">${escapeHtml(bbbT("click").toUpperCase())}</span>
+          <span class="eb-text">Checkout Button</span>
+        </div>
+        <div class="eb-actions">
+          <span class="eba-btn eba-replay">&#9654; ${escapeHtml(bbbT("replay"))}</span>
+          <span class="eba-btn eba-dl">&#8595; .md</span>
+          <span class="eba-btn eba-dl">&#8595; .json</span>
+          <span class="eba-btn eba-clear">&times; ${escapeHtml(bbbT("clear"))}</span>
         </div>
       </div>
     </div>

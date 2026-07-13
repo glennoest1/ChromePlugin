@@ -1,0 +1,8 @@
+{
+  "extName": {
+    "message": "Bug Black Box"
+  },
+  "extDescription": {
+    "message": "Record console logs, JavaScript errors, user actions, failed requests, screenshots, and replay into bug reports."
+  }
+}

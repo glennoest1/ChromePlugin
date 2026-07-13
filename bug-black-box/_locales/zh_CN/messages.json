@@ -1,0 +1,8 @@
+{
+  "extName": {
+    "message": "Bug Black Box"
+  },
+  "extDescription": {
+    "message": "将控制台日志、JavaScript 错误、用户操作、失败请求、截图和回放记录为缺陷报告。"
+  }
+}
