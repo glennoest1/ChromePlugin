@@ -3,6 +3,6 @@
     "message": "Bug Black Box"
   },
   "extDescription": {
-    "message": "Ghi console log, loi JavaScript, thao tac nguoi dung, request loi, anh chup man hinh va replay thanh bug report."
+    "message": "Ghi console log, lỗi JavaScript, thao tác người dùng, request lỗi, ảnh chụp màn hình và replay thành bug report."
   }
 }
