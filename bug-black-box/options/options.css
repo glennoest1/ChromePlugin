@@ -140,7 +140,8 @@ label.field-label {
   align-items: center;
 }
 
-input#apiKey {
+input#apiKey,
+.text-input {
   width: 100%;
   min-height: 42px;
   border: 1px solid var(--border-strong);
@@ -157,9 +158,11 @@ input#apiKey {
   letter-spacing: 0.3px;
 }
 
-input#apiKey::placeholder { color: var(--text-3); }
+input#apiKey::placeholder,
+.text-input::placeholder { color: var(--text-3); }
 
-input#apiKey:focus {
+input#apiKey:focus,
+.text-input:focus {
   border-color: var(--accent);
   box-shadow: 0 0 0 3px var(--accent-glow);
 }

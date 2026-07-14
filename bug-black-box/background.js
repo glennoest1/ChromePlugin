@@ -11,6 +11,7 @@ importScripts(
   "background/events.js",
   "background/report-builder.js",
   "background/recorder.js",
+  "background/report-sharing.js",
   "background/ai.js"
 );
 
@@ -101,11 +102,16 @@ async function runMessageHandler(message, sender) {
         eventBuffersByTab: {},
         focusedTabsByWindow: {},
         errorScreenshotsByTab: {},
-        lastReport: null
+        lastReport: null,
+        lastReportShare: null
       });
       return { ok: true };
     case "explainReport":
       return explainLastReport(message.report || null);
+    case "shareReport":
+      return shareReport(message.report || null);
+    case "fetchSharedReport":
+      return fetchSharedReport(message.shareId);
     default:
       return { ok: false, error: "UNKNOWN_ACTION" };
   }

@@ -1409,6 +1409,16 @@ h3 {
   background: var(--accent-dark);
 }
 
+.ra-share {
+  background: var(--blue);
+  color: #fff;
+  border-color: var(--blue);
+}
+
+.ra-share:hover {
+  background: var(--blue-dark);
+}
+
 .ra-dl {
   background: lightgreen;
   border: 1px solid transparent;
@@ -1432,6 +1442,41 @@ h3 {
   background: var(--red-soft);
   color: var(--red-dark);
   border-color: var(--red-border);
+}
+
+.report-share-status {
+  flex-shrink: 0;
+  margin: 0 15px;
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  font-size: 11px;
+  line-height: 1.45;
+  word-break: break-word;
+}
+
+.report-share-status a {
+  display: block;
+  color: inherit;
+  font-weight: 700;
+  margin: 2px 0;
+}
+
+.report-share-status.loading {
+  background: var(--blue-soft);
+  border: 1px solid var(--blue-border);
+  color: var(--blue-dark);
+}
+
+.report-share-status.success {
+  background: var(--green-soft);
+  border: 1px solid var(--green-border);
+  color: var(--green);
+}
+
+.report-share-status.error {
+  background: var(--red-soft);
+  border: 1px solid var(--red-border);
+  color: var(--red-dark);
 }
 
 /* ── Responsive ── */

@@ -11,7 +11,8 @@
     "tabs",
     "scripting",
     "webRequest",
-    "unlimitedStorage"
+    "unlimitedStorage",
+    "clipboardWrite"
   ],
   "host_permissions": [
     "<all_urls>",
