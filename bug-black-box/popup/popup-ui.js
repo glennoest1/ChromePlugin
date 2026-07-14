@@ -33,6 +33,7 @@ function getPopupApp() {
 function renderIdle(message = "") {
   clearTimer();
   activeReport = null;
+  activeReportShare = null;
   getPopupApp().innerHTML = `
     <section class="panel">
       <div class="header">
@@ -136,7 +137,7 @@ function updateRecordingTabs(recordingState) {
 
 // ── Report state (tabbed) ─────────────────────────────────────────────
 
-function renderReport(report, hasApiKey = false, aiMessage = "") {
+function renderReport(report, hasApiKey = false, aiMessage = "", shareResult = null) {
   clearTimer();
   activeReport = report;
 
@@ -227,8 +228,11 @@ function renderReport(report, hasApiKey = false, aiMessage = "") {
 
       <div class="tab-body" id="tabBody" role="tabpanel"></div>
 
+      <div class="report-share-status" id="shareStatus" role="status" hidden></div>
+
       <div class="report-actions">
         ${replayEventCount ? `<button class="ra-btn ra-replay" id="replayButton">\u25b6 ${escapeHtml(bbbT("replay"))}</button>` : ""}
+        <button class="ra-btn ra-share" id="shareButton">${escapeHtml(bbbT("share"))}</button>
         <button class="ra-btn ra-dl" id="downloadButton">\u2193 .md</button>
         <button class="ra-btn ra-dl" id="downloadJsonButton">\u2193 .json</button>
         <button class="ra-btn ra-clear" id="resetButton">\u00d7 ${escapeHtml(bbbT("clear"))}</button>
@@ -258,11 +262,13 @@ function renderReport(report, hasApiKey = false, aiMessage = "") {
   // Wire buttons
   document.getElementById("settingsButton").addEventListener("click", openOptions);
   bbbWireLanguageSelect();
+  document.getElementById("shareButton").addEventListener("click", shareActiveReport);
   document.getElementById("downloadButton").addEventListener("click", () => downloadReport(activeReport));
   document.getElementById("downloadJsonButton").addEventListener("click", () => downloadJsonReport(activeReport));
   document.getElementById("resetButton").addEventListener("click", resetReport);
   const replayBtn = document.getElementById("replayButton");
   if (replayBtn) replayBtn.addEventListener("click", openReplayPage);
+  renderStoredShareResult(shareResult);
   attachOpenOptionsLink();
 }
 

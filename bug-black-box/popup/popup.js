@@ -1,5 +1,6 @@
 let statusTimer = null;
 let activeReport = null;
+let activeReportShare = null;
 
 const ERROR_MESSAGES = {
   NO_ACTIVE_TAB: "noActiveTab",
@@ -10,6 +11,12 @@ const ERROR_MESSAGES = {
   MISSING_API_KEY: "missingApiKey",
   INVALID_API_KEY: "invalidApiKey",
   NETWORK_ERROR: "networkError",
+  MISSING_BACKEND_URL: "missingBackendUrl",
+  INVALID_REPORT: "invalidReport",
+  REPORT_TOO_LARGE: "reportTooLarge",
+  SERVER_ERROR: "serverError",
+  SHARE_FAILED: "shareFailed",
+  GZIP_UNSUPPORTED: "gzipUnsupported",
   RATE_LIMIT: "rateLimit",
   EMPTY_RESPONSE: "emptyResponse",
   EMPTY_REPORT: "emptyReport",
@@ -26,7 +33,8 @@ async function init() {
     renderRecording(status.recordingState, status.counts);
   } else if (status?.lastReport) {
     activeReport = status.lastReport;
-    renderReport(activeReport, status.hasApiKey);
+    activeReportShare = status.lastReportShare || null;
+    renderReport(activeReport, status.hasApiKey, "", activeReportShare);
   } else {
     renderIdle();
   }
@@ -66,7 +74,8 @@ async function stopRecording() {
   }
 
   const status = await sendMessage({ action: "getStatus" });
-  renderReport(response.report, status?.hasApiKey);
+  activeReportShare = status?.lastReportShare || null;
+  renderReport(response.report, status?.hasApiKey, "", activeReportShare);
 }
 
 async function resetReport() {
@@ -85,13 +94,83 @@ async function explainWithAI() {
 
   if (!response?.ok) {
     const status = await sendMessage({ action: "getStatus" });
-    renderReport(activeReport, status?.hasApiKey, bbbT(ERROR_MESSAGES[response?.error] || ERROR_MESSAGES.UNKNOWN_ERROR));
+    activeReportShare = status?.lastReportShare || null;
+    renderReport(activeReport, status?.hasApiKey, bbbT(ERROR_MESSAGES[response?.error] || ERROR_MESSAGES.UNKNOWN_ERROR), activeReportShare);
     attachOpenOptionsLink();
     return;
   }
 
   activeReport = response.report;
-  renderReport(activeReport, true);
+  const status = await sendMessage({ action: "getStatus" });
+  activeReportShare = status?.lastReportShare || null;
+  renderReport(activeReport, true, "", activeReportShare);
+}
+
+async function shareActiveReport() {
+  const button = document.getElementById("shareButton");
+  if (!activeReport) {
+    renderShareStatus("error", escapeHtml(bbbT("emptyReport")));
+    return;
+  }
+
+  if (button) {
+    button.disabled = true;
+    button.textContent = bbbT("sharing");
+  }
+  renderShareStatus("loading", escapeHtml(bbbT("shareUploading")));
+
+  const response = await sendMessage({ action: "shareReport" });
+  if (!response?.ok) {
+    renderShareStatus("error", escapeHtml(bbbT(ERROR_MESSAGES[response?.error] || "shareFailed")));
+    if (button) {
+      button.disabled = false;
+      button.textContent = bbbT("share");
+    }
+    return;
+  }
+
+  let copied = false;
+  try {
+    await navigator.clipboard.writeText(response.url);
+    copied = true;
+  } catch {
+    copied = false;
+  }
+
+  activeReportShare = response;
+  renderShareResult(response, copied ? bbbT("shareCopied") : bbbT("shareCopyManual"));
+
+  if (button) {
+    button.disabled = false;
+    button.textContent = bbbT("share");
+  }
+}
+
+function renderShareStatus(kind, html) {
+  const status = document.getElementById("shareStatus");
+  if (!status) return;
+  status.hidden = false;
+  status.className = `report-share-status ${kind}`;
+  status.innerHTML = html;
+}
+
+function renderStoredShareResult(shareResult) {
+  if (!shareResult?.url) return;
+  activeReportShare = shareResult;
+  renderShareResult(shareResult, bbbT("shareReady"));
+}
+
+function renderShareResult(shareResult, message) {
+  const expiresAt = shareResult.expiresAt ? formatDateTime(shareResult.expiresAt) : bbbT("unknown");
+  const replayViewerUrl = shareResult.shareId
+    ? chrome.runtime.getURL(`replay/replay.html?shareId=${encodeURIComponent(shareResult.shareId)}`)
+    : "";
+  renderShareStatus("success", `
+    <div>${escapeHtml(message)}</div>
+    <a href="${escapeHtml(shareResult.url)}" target="_blank" rel="noreferrer">${escapeHtml(shareResult.url)}</a>
+    ${replayViewerUrl ? `<a href="${escapeHtml(replayViewerUrl)}" target="_blank" rel="noreferrer">${escapeHtml(bbbT("openSharedReplay"))}</a>` : ""}
+    <div>${escapeHtml(bbbT("shareExpiresAt", { expiresAt }))}</div>
+  `);
 }
 
 function attachOpenOptionsLink() {

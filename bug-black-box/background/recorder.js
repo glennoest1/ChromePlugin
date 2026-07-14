@@ -121,7 +121,8 @@ async function startRecording(mode = "activeTab") {
       [tabKey]: [initialFocusEvent]
     },
     errorScreenshotsByTab: {},
-    lastReport: null
+    lastReport: null,
+    lastReportShare: null
   });
 
   if (recordingMode === "allTabs") {
@@ -262,13 +263,14 @@ async function getReplayEvents(tabId = null) {
 }
 
 async function getStatus() {
-  const { recordingState, eventBuffersByTab = {}, lastReport, apiConfig } =
-    await chrome.storage.local.get(["recordingState", "eventBuffersByTab", "lastReport", "apiConfig"]);
+  const { recordingState, eventBuffersByTab = {}, lastReport, lastReportShare, apiConfig } =
+    await chrome.storage.local.get(["recordingState", "eventBuffersByTab", "lastReport", "lastReportShare", "apiConfig"]);
 
   return {
     ok: true,
     recordingState: recordingState || { isRecording: false },
     lastReport: lastReport || null,
+    lastReportShare: getStoredShareForReport(lastReport, lastReportShare),
     counts: countEvents(getBufferedEvents(eventBuffersByTab)),
     hasApiKey: Boolean(apiConfig?.apiKey)
   };
