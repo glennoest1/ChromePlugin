@@ -65,7 +65,7 @@ function App() {
     document.title = isPrivacyPage
       ? `${copy.policyTitle} - Bug Black Box`
       : isReportPage
-        ? "Shared Report - Bug Black Box"
+        ? `${copy.reportDocumentTitle} - Bug Black Box`
         : copy.indexTitle;
     document
       .querySelector("meta[name='description']")
@@ -138,7 +138,7 @@ function Header({ copy, iconUrl, isDark, isPrivacyPage, isReportPage, language, 
   return (
     <header className="site-header">
       <div className={`topbar${isPrivacyPage ? "" : " topbar-wide"}`}>
-        <a className="brand" href="/" aria-label="Bug Black Box home" onClick={goHome}>
+        <a className="brand" href="/" aria-label={copy.brandHomeLabel} onClick={goHome}>
           <img src={iconUrl} alt="" />
           <span>Bug Black Box</span>
         </a>
@@ -153,7 +153,7 @@ function Header({ copy, iconUrl, isDark, isPrivacyPage, isReportPage, language, 
               </a>
             </>
           ) : (
-            <nav aria-label="Primary navigation">
+            <nav aria-label={copy.primaryNavLabel}>
               <a href="#features">{copy.navFeatures}</a>
               <a href="#privacy">{copy.navPrivacy}</a>
               <a href="/privacy" onClick={goPrivacy}>
@@ -197,8 +197,8 @@ function ReportPage({ copy, path, navigate }) {
   const [reportPayload, setReportPayload] = useState(null);
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const jsonPreview = useMemo(() => reportPayload ? buildJsonPreview(reportPayload) : null, [reportPayload]);
-  const screenshots = useMemo(() => reportPayload ? extractReportScreenshots(reportPayload) : [], [reportPayload]);
+  const jsonPreview = useMemo(() => reportPayload ? buildJsonPreview(reportPayload, copy) : null, [copy, reportPayload]);
+  const screenshots = useMemo(() => reportPayload ? extractReportScreenshots(reportPayload, copy) : [], [copy, reportPayload]);
 
   useEffect(() => {
     const nextShareId = getShareIdFromCurrentUrl();
@@ -275,18 +275,25 @@ function ReportPage({ copy, path, navigate }) {
       </section>
 
       {screenshots.length > 0 && (
-        <section className="screenshot-shell" aria-label="Report screenshots">
+        <section className="screenshot-shell" aria-label={copy.reportScreenshotsAriaLabel}>
           <div className="screenshot-head">
-            <span>Screenshots</span>
-            <span>{screenshots.length} rendered outside JSON</span>
+            <span>{copy.reportScreenshotsTitle}</span>
+            <span>{formatCopy(copy.reportScreenshotsRendered, { count: screenshots.length })}</span>
           </div>
           <div className="screenshot-grid">
             {screenshots.map((screenshot, index) => (
               <figure className="screenshot-card" key={screenshot.id || `${screenshot.tabId}-${index}`}>
-                <img src={screenshot.dataUrl} alt={screenshot.title || `Screenshot ${index + 1}`} loading="lazy" />
+                <img
+                  src={screenshot.dataUrl}
+                  alt={screenshot.title || formatCopy(copy.reportScreenshotAlt, { index: index + 1 })}
+                  loading="lazy"
+                />
                 <figcaption>
-                  <strong>{screenshot.title || `Screenshot ${index + 1}`}</strong>
-                  <span>{screenshot.reason || "captured"}{screenshot.tabId ? ` · tab ${screenshot.tabId}` : ""}</span>
+                  <strong>{screenshot.title || formatCopy(copy.reportScreenshotAlt, { index: index + 1 })}</strong>
+                  <span>
+                    {screenshot.reason || copy.reportScreenshotCaptured}
+                    {screenshot.tabId ? ` · ${formatCopy(copy.reportScreenshotTab, { tabId: screenshot.tabId })}` : ""}
+                  </span>
                 </figcaption>
               </figure>
             ))}
@@ -297,17 +304,17 @@ function ReportPage({ copy, path, navigate }) {
       <section className="json-shell" aria-live="polite">
         <div className="json-head">
           <span>{loadedShareId ? `shareId: ${loadedShareId}` : copy.reportNoLoaded}</span>
-          <span>{isLoading ? copy.reportFetching : reportPayload ? "Preview JSON" : copy.reportReady}</span>
+          <span>{isLoading ? copy.reportFetching : reportPayload ? copy.reportJsonPreviewStatus : copy.reportReady}</span>
         </div>
         {error ? (
           <p className="json-message json-error">{error}</p>
         ) : reportPayload ? (
           <>
             <p className="json-note">
-              Preview omits large base64 fields and truncates long arrays/strings so the report stays readable.
-              {jsonPreview?.stats?.omittedFields ? ` Omitted heavy fields: ${jsonPreview.stats.omittedFields}.` : ""}
-              {jsonPreview?.stats?.truncatedArrays ? ` Truncated arrays: ${jsonPreview.stats.truncatedArrays}.` : ""}
-              {jsonPreview?.stats?.omittedEvents ? ` Omitted events: ${jsonPreview.stats.omittedEvents}.` : ""}
+              {copy.reportJsonPreviewNote}
+              {jsonPreview?.stats?.omittedFields ? ` ${formatCopy(copy.reportJsonOmittedFields, { count: jsonPreview.stats.omittedFields })}` : ""}
+              {jsonPreview?.stats?.truncatedArrays ? ` ${formatCopy(copy.reportJsonTruncatedArrays, { count: jsonPreview.stats.truncatedArrays })}` : ""}
+              {jsonPreview?.stats?.omittedEvents ? ` ${formatCopy(copy.reportJsonOmittedEvents, { count: jsonPreview.stats.omittedEvents })}` : ""}
             </p>
             <pre className="json-viewer">{jsonPreview?.text || ""}</pre>
           </>
@@ -342,7 +349,7 @@ function HomePage({ copy, navigate }) {
           </div>
         </div>
 
-        <div className="terminal" aria-label="Example bug report preview">
+        <div className="terminal" aria-label={copy.terminalPreviewLabel}>
           <div className="terminal-head">
             <span className="dots" aria-hidden="true">
               <span />
@@ -496,6 +503,12 @@ function renderInlineCode(text) {
     .map((part, index) => (codeValues.includes(part) ? <code key={`${part}-${index}`}>{part}</code> : part));
 }
 
+function formatCopy(template, params = {}) {
+  return String(template || "").replace(/\{(\w+)\}/g, (_match, key) =>
+    params[key] === undefined || params[key] === null ? "" : String(params[key])
+  );
+}
+
 function escapeRegExp(value) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
@@ -549,7 +562,7 @@ function buildReportApiUrl(shareId) {
   return `${REPORT_API_BASE_URL}/api/reports/${encodeURIComponent(shareId)}`;
 }
 
-function buildJsonPreview(payload) {
+function buildJsonPreview(payload, copy = COPY.en) {
   const stats = {
     omittedFields: 0,
     truncatedArrays: 0,
@@ -557,12 +570,12 @@ function buildJsonPreview(payload) {
     truncatedStrings: 0,
     omittedEvents: 0
   };
-  const value = buildReportPayloadPreview(payload, stats) || previewJsonValue(payload, "", stats, new WeakSet());
+  const value = buildReportPayloadPreview(payload, stats, copy) || previewJsonValue(payload, "", stats, new WeakSet(), copy);
   const text = JSON.stringify(value, null, 2);
 
   if (text.length > JSON_PREVIEW_MAX_OUTPUT_LENGTH) {
     return {
-      text: `${text.slice(0, JSON_PREVIEW_MAX_OUTPUT_LENGTH)}\n... [preview truncated at ${formatBytes(JSON_PREVIEW_MAX_OUTPUT_LENGTH)}]`,
+      text: `${text.slice(0, JSON_PREVIEW_MAX_OUTPUT_LENGTH)}\n... ${formatCopy(copy.reportPreviewTruncatedAt, { size: formatBytes(JSON_PREVIEW_MAX_OUTPUT_LENGTH) })}`,
       stats: {
         ...stats,
         truncatedStrings: stats.truncatedStrings + 1
@@ -576,7 +589,7 @@ function buildJsonPreview(payload) {
   };
 }
 
-function extractReportScreenshots(payload) {
+function extractReportScreenshots(payload, copy = COPY.en) {
   const report = payload?.report && typeof payload.report === "object" ? payload.report : payload;
   if (!report || typeof report !== "object") return [];
 
@@ -590,8 +603,8 @@ function extractReportScreenshots(payload) {
     addScreenshot(screenshots, seen, {
       id: "primary-screenshot",
       tabId: report.rootTabId,
-      title: "Primary screenshot",
-      reason: "primary",
+      title: copy.reportPrimaryScreenshotTitle,
+      reason: copy.reportScreenshotPrimaryReason,
       dataUrl: report.screenshotBase64
     });
   }
@@ -637,7 +650,7 @@ function isDataImage(value) {
   return typeof value === "string" && value.startsWith("data:image/");
 }
 
-function buildReportPayloadPreview(payload, stats) {
+function buildReportPayloadPreview(payload, stats, copy = COPY.en) {
   const wrappedReport = payload?.report && typeof payload.report === "object" ? payload.report : null;
   const directReport = isReportLikePayload(payload) ? payload : null;
   const report = wrappedReport || directReport;
@@ -651,14 +664,14 @@ function buildReportPayloadPreview(payload, stats) {
       version: payload.version,
       createdAt: payload.createdAt,
       expiresAt: payload.expiresAt,
-      report: buildReportPreview(report, stats),
-      __previewNote: "Large fields are omitted for browser rendering. Use the extension export or backend API for the full payload."
+      report: buildReportPreview(report, stats, copy),
+      __previewNote: copy.reportPreviewPayloadNote
     });
   }
 
   return {
-    ...buildReportPreview(report, stats),
-    __previewNote: "Large fields are omitted for browser rendering. Use the extension export or backend API for the full payload."
+    ...buildReportPreview(report, stats, copy),
+    __previewNote: copy.reportPreviewPayloadNote
   };
 }
 
@@ -671,7 +684,7 @@ function isReportLikePayload(value) {
   ));
 }
 
-function buildReportPreview(report, stats) {
+function buildReportPreview(report, stats, copy = COPY.en) {
   const tabs = Array.isArray(report.tabs) ? report.tabs : [];
   const topLevelEvents = Array.isArray(report.events) ? report.events : [];
   const events = topLevelEvents.length ? topLevelEvents : tabs.flatMap((tab) => Array.isArray(tab.events) ? tab.events : []);
@@ -688,17 +701,17 @@ function buildReportPreview(report, stats) {
     replayEventCount: report.replayEventCount,
     replayTabs: report.replayTabs,
     replayStatus: report.replayStatus,
-    tabs: tabs.map((tab) => compactReportTab(tab, stats)),
-    eventsPreview: compactEvents(events, stats),
+    tabs: tabs.map((tab) => compactReportTab(tab, stats, copy)),
+    eventsPreview: compactEvents(events, stats, copy),
     eventCount: events.length,
-    screenshots: screenshots.map((screenshot) => compactScreenshot(screenshot, stats)),
+    screenshots: screenshots.map((screenshot) => compactScreenshot(screenshot, stats, copy)),
     screenshotCount: screenshots.length,
     screenshotError: report.screenshotError,
-    aiExplanation: previewJsonValue(report.aiExplanation || null, "aiExplanation", stats, new WeakSet())
+    aiExplanation: previewJsonValue(report.aiExplanation || null, "aiExplanation", stats, new WeakSet(), copy)
   });
 }
 
-function compactReportTab(tab, stats) {
+function compactReportTab(tab, stats, copy = COPY.en) {
   const events = Array.isArray(tab.events) ? tab.events : [];
   const replayEvents = Array.isArray(tab.replay?.events) ? tab.replay.events : [];
   stats.omittedEvents += replayEvents.length;
@@ -711,19 +724,19 @@ function compactReportTab(tab, stats) {
     startedAt: tab.startedAt,
     activeRanges: tab.activeRanges,
     eventCount: events.length,
-    eventsPreview: compactEvents(events, stats),
+    eventsPreview: compactEvents(events, stats, copy),
     replay: tab.replay ? {
       eventCount: Number(tab.replay.eventCount || replayEvents.length || 0),
       truncated: Boolean(tab.replay.truncated),
       truncatedReason: tab.replay.truncatedReason || null,
-      events: replayEvents.length ? `[omitted ${replayEvents.length} replay events]` : undefined
+      events: replayEvents.length ? formatCopy(copy.reportPreviewOmittedReplayEvents, { count: replayEvents.length }) : undefined
     } : undefined,
-    screenshot: tab.screenshot ? compactScreenshot(tab.screenshot, stats) : undefined,
+    screenshot: tab.screenshot ? compactScreenshot(tab.screenshot, stats, copy) : undefined,
     screenshotError: tab.screenshotError
   });
 }
 
-function compactEvents(events, stats) {
+function compactEvents(events, stats, copy = COPY.en) {
   if (!Array.isArray(events) || !events.length) return [];
 
   if (events.length > REPORT_PREVIEW_MAX_EVENTS) {
@@ -734,7 +747,7 @@ function compactEvents(events, stats) {
   const shownEvents = events.slice(0, REPORT_PREVIEW_MAX_EVENTS).map(compactEvent);
   if (events.length > REPORT_PREVIEW_MAX_EVENTS) {
     shownEvents.push({
-      __previewTruncated: `${events.length - REPORT_PREVIEW_MAX_EVENTS} more events omitted`,
+      __previewTruncated: formatCopy(copy.reportPreviewMoreEventsOmitted, { count: events.length - REPORT_PREVIEW_MAX_EVENTS }),
       totalItems: events.length
     });
   }
@@ -766,7 +779,7 @@ function compactEvent(event) {
   });
 }
 
-function compactScreenshot(screenshot, stats) {
+function compactScreenshot(screenshot, stats, copy = COPY.en) {
   if (!screenshot || typeof screenshot !== "object") return screenshot;
   if (screenshot.dataUrl) stats.omittedFields += 1;
 
@@ -779,22 +792,22 @@ function compactScreenshot(screenshot, stats) {
     eventType: screenshot.eventType,
     severity: screenshot.severity,
     capturedAt: screenshot.capturedAt,
-    dataUrl: screenshot.dataUrl ? `[rendered as image above, ${formatBytes(screenshot.dataUrl.length)}]` : undefined,
+    dataUrl: screenshot.dataUrl ? formatCopy(copy.reportPreviewRenderedImage, { size: formatBytes(screenshot.dataUrl.length) }) : undefined,
     dataUrlLength: screenshot.dataUrl?.length,
     error: screenshot.error
   });
 }
 
-function previewJsonValue(value, key, stats, seen) {
+function previewJsonValue(value, key, stats, seen, copy = COPY.en) {
   if (typeof value === "string") {
     if (JSON_PREVIEW_HEAVY_KEYS.has(key)) {
       stats.omittedFields += 1;
-      return `[omitted ${key}, ${formatBytes(value.length)}]`;
+      return formatCopy(copy.reportPreviewOmittedKey, { key, size: formatBytes(value.length) });
     }
 
     if (value.length > JSON_PREVIEW_MAX_STRING_LENGTH) {
       stats.truncatedStrings += 1;
-      return `${value.slice(0, JSON_PREVIEW_MAX_STRING_LENGTH)}... [truncated ${formatBytes(value.length)} string]`;
+      return `${value.slice(0, JSON_PREVIEW_MAX_STRING_LENGTH)}... ${formatCopy(copy.reportPreviewTruncatedString, { size: formatBytes(value.length) })}`;
     }
 
     return value;
@@ -802,18 +815,18 @@ function previewJsonValue(value, key, stats, seen) {
 
   if (!value || typeof value !== "object") return value;
 
-  if (seen.has(value)) return "[circular]";
+  if (seen.has(value)) return copy.reportPreviewCircular;
   seen.add(value);
 
   if (Array.isArray(value)) {
     const shownItems = value
       .slice(0, JSON_PREVIEW_MAX_ARRAY_ITEMS)
-      .map((item) => previewJsonValue(item, "", stats, seen));
+      .map((item) => previewJsonValue(item, "", stats, seen, copy));
 
     if (value.length > JSON_PREVIEW_MAX_ARRAY_ITEMS) {
       stats.truncatedArrays += 1;
       shownItems.push({
-        __previewTruncated: `${value.length - JSON_PREVIEW_MAX_ARRAY_ITEMS} more items omitted`,
+        __previewTruncated: formatCopy(copy.reportPreviewMoreItemsOmitted, { count: value.length - JSON_PREVIEW_MAX_ARRAY_ITEMS }),
         totalItems: value.length
       });
     }
@@ -826,12 +839,12 @@ function previewJsonValue(value, key, stats, seen) {
   const shownEntries = entries.slice(0, JSON_PREVIEW_MAX_OBJECT_KEYS);
   const preview = Object.fromEntries(shownEntries.map(([entryKey, entryValue]) => [
     entryKey,
-    previewJsonValue(entryValue, entryKey, stats, seen)
+    previewJsonValue(entryValue, entryKey, stats, seen, copy)
   ]));
 
   if (entries.length > JSON_PREVIEW_MAX_OBJECT_KEYS) {
     stats.truncatedObjects += 1;
-    preview.__previewTruncated = `${entries.length - JSON_PREVIEW_MAX_OBJECT_KEYS} more keys omitted`;
+    preview.__previewTruncated = formatCopy(copy.reportPreviewMoreKeysOmitted, { count: entries.length - JSON_PREVIEW_MAX_OBJECT_KEYS });
     preview.__totalKeys = entries.length;
   }
 

@@ -121,7 +121,7 @@ function buildBackendUrl(path, baseUrl) {
 
 function buildShareUrl(shareId) {
   const baseUrl = normalizeBaseUrl(FRONTEND_BASE_URL) || normalizeBaseUrl(BACKEND_BASE_URL);
-  return buildUrl(`/api/reports/${encodeURIComponent(shareId || "")}`, baseUrl);
+  return buildUrl(`/reports/${encodeURIComponent(shareId || "")}`, baseUrl);
 }
 
 function normalizeShareResult(shareResult) {
