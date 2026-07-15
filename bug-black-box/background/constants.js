@@ -6,4 +6,4 @@ const STOP_EVENT_GRACE_MS = 250;
 const RECORDING_MODES = new Set(["activeTab", "allTabs"]);
 const ACTION_EVENT_TYPES = new Set(["click", "submit"]);
 const CORRELATABLE_EVENT_TYPES = new Set(["console", "network", "networkError"]);
-const BACKEND_BASE_URL = "http://localhost:8080";
+const BACKEND_BASE_URL = "https://chromepluginbackend.onrender.com";

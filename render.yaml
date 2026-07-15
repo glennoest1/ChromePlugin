@@ -1,0 +1,10 @@
+services:
+  - type: web
+    name: bug-black-box-web-office
+    runtime: static
+    buildCommand: cd web-office && npm install && npm run build
+    staticPublishPath: ./web-office/dist
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html

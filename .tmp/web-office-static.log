@@ -1,0 +1,5 @@
+
+> bug-black-box-web-office@1.0.0 serve:dist
+> node scripts/serve-dist.mjs 4173
+
+Serving D:\chrome-plugin\ChromePlugin\web-office\dist at http://localhost:4173/
