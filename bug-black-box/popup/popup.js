@@ -168,7 +168,6 @@ function renderShareResult(shareResult, message) {
   renderShareStatus("success", `
     <div>${escapeHtml(message)}</div>
     <a href="${escapeHtml(shareResult.url)}" target="_blank" rel="noreferrer">${escapeHtml(shareResult.url)}</a>
-    ${replayViewerUrl ? `<a href="${escapeHtml(replayViewerUrl)}" target="_blank" rel="noreferrer">${escapeHtml(bbbT("openSharedReplay"))}</a>` : ""}
     <div>${escapeHtml(bbbT("shareExpiresAt", { expiresAt }))}</div>
   `);
 }
