@@ -169,7 +169,8 @@ function dedupeReportScreenshots(screenshots) {
       eventType: screenshot.eventType || null,
       severity: screenshot.severity || null,
       capturedAt: screenshot.capturedAt || null,
-      dataUrl: screenshot.dataUrl
+      dataUrlOmitted: true,
+      dataUrlLength: screenshot.dataUrl.length
     });
   }
 

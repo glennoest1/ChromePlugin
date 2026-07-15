@@ -7,3 +7,4 @@ const RECORDING_MODES = new Set(["activeTab", "allTabs"]);
 const ACTION_EVENT_TYPES = new Set(["click", "submit"]);
 const CORRELATABLE_EVENT_TYPES = new Set(["console", "network", "networkError"]);
 const BACKEND_BASE_URL = "https://chromepluginbackend.onrender.com";
+const FRONTEND_BASE_URL = "https://bug-black-box-web-office.onrender.com";

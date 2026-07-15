@@ -628,6 +628,15 @@ footer {
   color: var(--terminal-muted);
 }
 
+.json-note {
+  margin: 0;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+  color: var(--terminal-muted);
+  background: rgba(255, 255, 255, 0.04);
+  font-size: 13px;
+}
+
 .json-error {
   color: #fecdd3;
 }

@@ -26,7 +26,7 @@ async function shareReport(reportFromPopup) {
   }
 
   const shareId = payload?.shareId || "";
-  const shareUrl = buildShareUrl(shareId, baseUrl);
+  const shareUrl = buildShareUrl(shareId);
   const shareResult = {
     shareId,
     url: shareUrl,
@@ -44,7 +44,8 @@ async function shareReport(reportFromPopup) {
 
 function getStoredShareForReport(report, shareResult) {
   if (!report || !shareResult) return null;
-  return shareResult.reportKey === getReportShareKey(report) ? shareResult : null;
+  if (shareResult.reportKey !== getReportShareKey(report)) return null;
+  return normalizeShareResult(shareResult);
 }
 
 function getReportShareKey(report) {
@@ -95,10 +96,10 @@ async function fetchSharedReport(shareId) {
 
 async function getBackendBaseUrl() {
   const { backendConfig } = await chrome.storage.local.get("backendConfig").catch(() => ({}));
-  return normalizeBackendBaseUrl(backendConfig?.baseUrl || BACKEND_BASE_URL);
+  return normalizeBaseUrl(backendConfig?.baseUrl || BACKEND_BASE_URL);
 }
 
-function normalizeBackendBaseUrl(value) {
+function normalizeBaseUrl(value) {
   const baseUrl = String(value || "").trim().replace(/\/+$/, "");
   if (!baseUrl) return "";
 
@@ -110,12 +111,39 @@ function normalizeBackendBaseUrl(value) {
   }
 }
 
-function buildBackendUrl(path, baseUrl) {
+function buildUrl(path, baseUrl) {
   return `${baseUrl}/${String(path || "").replace(/^\/+/, "")}`;
 }
 
-function buildShareUrl(shareId, baseUrl) {
-  return buildBackendUrl(`/api/reports/${encodeURIComponent(shareId || "")}`, baseUrl);
+function buildBackendUrl(path, baseUrl) {
+  return buildUrl(path, baseUrl);
+}
+
+function buildShareUrl(shareId) {
+  const baseUrl = normalizeBaseUrl(FRONTEND_BASE_URL) || normalizeBaseUrl(BACKEND_BASE_URL);
+  return buildUrl(`/api/reports/${encodeURIComponent(shareId || "")}`, baseUrl);
+}
+
+function normalizeShareResult(shareResult) {
+  const shareId = String(shareResult.shareId || extractShareIdFromUrl(shareResult.url) || "").trim();
+  return {
+    ...shareResult,
+    shareId,
+    url: buildShareUrl(shareId)
+  };
+}
+
+function extractShareIdFromUrl(value) {
+  try {
+    const parsed = new URL(value);
+    const queryId = parsed.searchParams.get("shareId") || parsed.searchParams.get("id");
+    if (queryId) return queryId;
+
+    const pathParts = parsed.pathname.split("/").filter(Boolean);
+    return pathParts[pathParts.length - 1] || "";
+  } catch {
+    return "";
+  }
 }
 
 async function gzipJson(report) {

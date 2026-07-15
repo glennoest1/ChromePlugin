@@ -6,6 +6,12 @@ import "../styles.css";
 
 const THEME_KEY = "bbb-web-theme";
 const REPORT_API_BASE_URL = (import.meta.env.VITE_REPORT_API_BASE_URL || "https://chromepluginbackend.onrender.com").replace(/\/+$/, "");
+const JSON_PREVIEW_MAX_ARRAY_ITEMS = 20;
+const JSON_PREVIEW_MAX_OBJECT_KEYS = 80;
+const JSON_PREVIEW_MAX_STRING_LENGTH = 300;
+const JSON_PREVIEW_MAX_OUTPUT_LENGTH = 90000;
+const REPORT_PREVIEW_MAX_EVENTS = 30;
+const JSON_PREVIEW_HEAVY_KEYS = new Set(["dataUrl", "screenshotBase64"]);
 
 function getInitialLanguage() {
   try {
@@ -191,6 +197,7 @@ function ReportPage({ copy, path, navigate }) {
   const [reportPayload, setReportPayload] = useState(null);
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const jsonPreview = useMemo(() => reportPayload ? buildJsonPreview(reportPayload) : null, [reportPayload]);
 
   useEffect(() => {
     const nextShareId = getShareIdFromCurrentUrl();
@@ -269,12 +276,20 @@ function ReportPage({ copy, path, navigate }) {
       <section className="json-shell" aria-live="polite">
         <div className="json-head">
           <span>{loadedShareId ? `shareId: ${loadedShareId}` : copy.reportNoLoaded}</span>
-          <span>{isLoading ? copy.reportFetching : reportPayload ? copy.reportJsonStatus : copy.reportReady}</span>
+          <span>{isLoading ? copy.reportFetching : reportPayload ? "Preview JSON" : copy.reportReady}</span>
         </div>
         {error ? (
           <p className="json-message json-error">{error}</p>
         ) : reportPayload ? (
-          <pre className="json-viewer">{JSON.stringify(reportPayload, null, 2)}</pre>
+          <>
+            <p className="json-note">
+              Preview omits large base64 fields and truncates long arrays/strings so the report stays readable.
+              {jsonPreview?.stats?.omittedFields ? ` Omitted heavy fields: ${jsonPreview.stats.omittedFields}.` : ""}
+              {jsonPreview?.stats?.truncatedArrays ? ` Truncated arrays: ${jsonPreview.stats.truncatedArrays}.` : ""}
+              {jsonPreview?.stats?.omittedEvents ? ` Omitted events: ${jsonPreview.stats.omittedEvents}.` : ""}
+            </p>
+            <pre className="json-viewer">{jsonPreview?.text || ""}</pre>
+          </>
         ) : (
           <p className="json-message">{copy.reportEmptyMessage}</p>
         )}
@@ -511,6 +526,236 @@ function safeDecodeURIComponent(value) {
 
 function buildReportApiUrl(shareId) {
   return `${REPORT_API_BASE_URL}/api/reports/${encodeURIComponent(shareId)}`;
+}
+
+function buildJsonPreview(payload) {
+  const stats = {
+    omittedFields: 0,
+    truncatedArrays: 0,
+    truncatedObjects: 0,
+    truncatedStrings: 0,
+    omittedEvents: 0
+  };
+  const value = buildReportPayloadPreview(payload, stats) || previewJsonValue(payload, "", stats, new WeakSet());
+  const text = JSON.stringify(value, null, 2);
+
+  if (text.length > JSON_PREVIEW_MAX_OUTPUT_LENGTH) {
+    return {
+      text: `${text.slice(0, JSON_PREVIEW_MAX_OUTPUT_LENGTH)}\n... [preview truncated at ${formatBytes(JSON_PREVIEW_MAX_OUTPUT_LENGTH)}]`,
+      stats: {
+        ...stats,
+        truncatedStrings: stats.truncatedStrings + 1
+      }
+    };
+  }
+
+  return {
+    text,
+    stats
+  };
+}
+
+function buildReportPayloadPreview(payload, stats) {
+  const report = payload?.report && typeof payload.report === "object" ? payload.report : null;
+  if (!report) return null;
+
+  return removeEmptyPreviewFields({
+    ok: payload.ok,
+    shareId: payload.shareId,
+    rootUrl: payload.rootUrl,
+    version: payload.version,
+    createdAt: payload.createdAt,
+    expiresAt: payload.expiresAt,
+    report: buildReportPreview(report, stats),
+    __previewNote: "Large fields are omitted for browser rendering. Use the extension export or backend API for the full payload."
+  });
+}
+
+function buildReportPreview(report, stats) {
+  const tabs = Array.isArray(report.tabs) ? report.tabs : [];
+  const topLevelEvents = Array.isArray(report.events) ? report.events : [];
+  const events = topLevelEvents.length ? topLevelEvents : tabs.flatMap((tab) => Array.isArray(tab.events) ? tab.events : []);
+  const screenshots = Array.isArray(report.screenshots) ? report.screenshots : [];
+
+  return removeEmptyPreviewFields({
+    version: report.version,
+    mode: report.mode,
+    rootTabId: report.rootTabId,
+    startedAt: report.startedAt,
+    stoppedAt: report.stoppedAt,
+    durationSeconds: report.durationSeconds,
+    summary: report.summary,
+    replayEventCount: report.replayEventCount,
+    replayTabs: report.replayTabs,
+    replayStatus: report.replayStatus,
+    tabs: tabs.map((tab) => compactReportTab(tab, stats)),
+    eventsPreview: compactEvents(events, stats),
+    eventCount: events.length,
+    screenshots: screenshots.map((screenshot) => compactScreenshot(screenshot, stats)),
+    screenshotCount: screenshots.length,
+    screenshotError: report.screenshotError,
+    aiExplanation: previewJsonValue(report.aiExplanation || null, "aiExplanation", stats, new WeakSet())
+  });
+}
+
+function compactReportTab(tab, stats) {
+  const events = Array.isArray(tab.events) ? tab.events : [];
+  const replayEvents = Array.isArray(tab.replay?.events) ? tab.replay.events : [];
+  stats.omittedEvents += replayEvents.length;
+
+  return removeEmptyPreviewFields({
+    tabId: tab.tabId,
+    title: tab.title,
+    url: tab.url,
+    windowId: tab.windowId,
+    startedAt: tab.startedAt,
+    activeRanges: tab.activeRanges,
+    eventCount: events.length,
+    eventsPreview: compactEvents(events, stats),
+    replay: tab.replay ? {
+      eventCount: Number(tab.replay.eventCount || replayEvents.length || 0),
+      truncated: Boolean(tab.replay.truncated),
+      truncatedReason: tab.replay.truncatedReason || null,
+      events: replayEvents.length ? `[omitted ${replayEvents.length} replay events]` : undefined
+    } : undefined,
+    screenshot: tab.screenshot ? compactScreenshot(tab.screenshot, stats) : undefined,
+    screenshotError: tab.screenshotError
+  });
+}
+
+function compactEvents(events, stats) {
+  if (!Array.isArray(events) || !events.length) return [];
+
+  if (events.length > REPORT_PREVIEW_MAX_EVENTS) {
+    stats.truncatedArrays += 1;
+    stats.omittedEvents += events.length - REPORT_PREVIEW_MAX_EVENTS;
+  }
+
+  const shownEvents = events.slice(0, REPORT_PREVIEW_MAX_EVENTS).map(compactEvent);
+  if (events.length > REPORT_PREVIEW_MAX_EVENTS) {
+    shownEvents.push({
+      __previewTruncated: `${events.length - REPORT_PREVIEW_MAX_EVENTS} more events omitted`,
+      totalItems: events.length
+    });
+  }
+
+  return shownEvents;
+}
+
+function compactEvent(event) {
+  if (!event || typeof event !== "object") return event;
+
+  return removeEmptyPreviewFields({
+    type: event.type,
+    level: event.level,
+    method: event.method,
+    statusCode: event.statusCode,
+    timestamp: event.timestamp,
+    relativeTime: event.relativeTime,
+    tabId: event.tabId,
+    eventId: event.eventId,
+    triggeredByActionId: event.triggeredByActionId,
+    selector: limitPreviewText(event.selector, 160),
+    text: limitPreviewText(event.text, 160),
+    message: limitPreviewText(event.message, 240),
+    url: limitPreviewText(event.url, 240),
+    source: limitPreviewText(event.source, 240),
+    error: limitPreviewText(event.error, 160),
+    stack: limitPreviewText(event.stack, 400),
+    durationMs: event.durationMs
+  });
+}
+
+function compactScreenshot(screenshot, stats) {
+  if (!screenshot || typeof screenshot !== "object") return screenshot;
+  if (screenshot.dataUrl) stats.omittedFields += 1;
+
+  return removeEmptyPreviewFields({
+    screenshotId: screenshot.screenshotId,
+    tabId: screenshot.tabId,
+    title: screenshot.title,
+    url: screenshot.url,
+    reason: screenshot.reason,
+    eventType: screenshot.eventType,
+    severity: screenshot.severity,
+    capturedAt: screenshot.capturedAt,
+    dataUrl: screenshot.dataUrl ? `[omitted dataUrl, ${formatBytes(screenshot.dataUrl.length)}]` : undefined,
+    dataUrlLength: screenshot.dataUrl?.length,
+    error: screenshot.error
+  });
+}
+
+function previewJsonValue(value, key, stats, seen) {
+  if (typeof value === "string") {
+    if (JSON_PREVIEW_HEAVY_KEYS.has(key)) {
+      stats.omittedFields += 1;
+      return `[omitted ${key}, ${formatBytes(value.length)}]`;
+    }
+
+    if (value.length > JSON_PREVIEW_MAX_STRING_LENGTH) {
+      stats.truncatedStrings += 1;
+      return `${value.slice(0, JSON_PREVIEW_MAX_STRING_LENGTH)}... [truncated ${formatBytes(value.length)} string]`;
+    }
+
+    return value;
+  }
+
+  if (!value || typeof value !== "object") return value;
+
+  if (seen.has(value)) return "[circular]";
+  seen.add(value);
+
+  if (Array.isArray(value)) {
+    const shownItems = value
+      .slice(0, JSON_PREVIEW_MAX_ARRAY_ITEMS)
+      .map((item) => previewJsonValue(item, "", stats, seen));
+
+    if (value.length > JSON_PREVIEW_MAX_ARRAY_ITEMS) {
+      stats.truncatedArrays += 1;
+      shownItems.push({
+        __previewTruncated: `${value.length - JSON_PREVIEW_MAX_ARRAY_ITEMS} more items omitted`,
+        totalItems: value.length
+      });
+    }
+
+    seen.delete(value);
+    return shownItems;
+  }
+
+  const entries = Object.entries(value);
+  const shownEntries = entries.slice(0, JSON_PREVIEW_MAX_OBJECT_KEYS);
+  const preview = Object.fromEntries(shownEntries.map(([entryKey, entryValue]) => [
+    entryKey,
+    previewJsonValue(entryValue, entryKey, stats, seen)
+  ]));
+
+  if (entries.length > JSON_PREVIEW_MAX_OBJECT_KEYS) {
+    stats.truncatedObjects += 1;
+    preview.__previewTruncated = `${entries.length - JSON_PREVIEW_MAX_OBJECT_KEYS} more keys omitted`;
+    preview.__totalKeys = entries.length;
+  }
+
+  seen.delete(value);
+  return preview;
+}
+
+function limitPreviewText(value, maxLength) {
+  if (value === undefined || value === null) return undefined;
+  const text = String(value);
+  return text.length > maxLength ? `${text.slice(0, maxLength)}...` : text;
+}
+
+function formatBytes(characterCount) {
+  const bytes = Number(characterCount || 0);
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+}
+
+function removeEmptyPreviewFields(value) {
+  return Object.fromEntries(Object.entries(value).filter(([, fieldValue]) =>
+    fieldValue !== undefined && fieldValue !== null
+  ));
 }
 
 createRoot(document.getElementById("root")).render(
