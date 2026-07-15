@@ -198,6 +198,7 @@ function ReportPage({ copy, path, navigate }) {
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const jsonPreview = useMemo(() => reportPayload ? buildJsonPreview(reportPayload) : null, [reportPayload]);
+  const screenshots = useMemo(() => reportPayload ? extractReportScreenshots(reportPayload) : [], [reportPayload]);
 
   useEffect(() => {
     const nextShareId = getShareIdFromCurrentUrl();
@@ -272,6 +273,26 @@ function ReportPage({ copy, path, navigate }) {
           </div>
         </form>
       </section>
+
+      {screenshots.length > 0 && (
+        <section className="screenshot-shell" aria-label="Report screenshots">
+          <div className="screenshot-head">
+            <span>Screenshots</span>
+            <span>{screenshots.length} rendered outside JSON</span>
+          </div>
+          <div className="screenshot-grid">
+            {screenshots.map((screenshot, index) => (
+              <figure className="screenshot-card" key={screenshot.id || `${screenshot.tabId}-${index}`}>
+                <img src={screenshot.dataUrl} alt={screenshot.title || `Screenshot ${index + 1}`} loading="lazy" />
+                <figcaption>
+                  <strong>{screenshot.title || `Screenshot ${index + 1}`}</strong>
+                  <span>{screenshot.reason || "captured"}{screenshot.tabId ? ` · tab ${screenshot.tabId}` : ""}</span>
+                </figcaption>
+              </figure>
+            ))}
+          </div>
+        </section>
+      )}
 
       <section className="json-shell" aria-live="polite">
         <div className="json-head">
@@ -555,20 +576,99 @@ function buildJsonPreview(payload) {
   };
 }
 
+function extractReportScreenshots(payload) {
+  const report = payload?.report && typeof payload.report === "object" ? payload.report : payload;
+  if (!report || typeof report !== "object") return [];
+
+  const screenshots = [];
+  const seen = new Set();
+
+  collectScreenshotCandidates(report.screenshots, screenshots, seen);
+  collectScreenshotCandidates(report.tabs, screenshots, seen);
+
+  if (isDataImage(report.screenshotBase64)) {
+    addScreenshot(screenshots, seen, {
+      id: "primary-screenshot",
+      tabId: report.rootTabId,
+      title: "Primary screenshot",
+      reason: "primary",
+      dataUrl: report.screenshotBase64
+    });
+  }
+
+  return screenshots;
+}
+
+function collectScreenshotCandidates(value, screenshots, seen) {
+  if (!Array.isArray(value)) return;
+
+  value.forEach((item, index) => {
+    if (!item || typeof item !== "object") return;
+
+    if (isDataImage(item.dataUrl)) {
+      addScreenshot(screenshots, seen, {
+        id: item.screenshotId || `screenshot-${screenshots.length + 1}`,
+        tabId: item.tabId,
+        title: item.title || "",
+        reason: item.reason || "",
+        dataUrl: item.dataUrl
+      });
+    }
+
+    if (item.screenshot && typeof item.screenshot === "object" && isDataImage(item.screenshot.dataUrl)) {
+      addScreenshot(screenshots, seen, {
+        id: item.screenshot.screenshotId || `tab-screenshot-${item.tabId || index}`,
+        tabId: item.tabId,
+        title: item.title || item.screenshot.title || "",
+        reason: item.screenshot.reason || "",
+        dataUrl: item.screenshot.dataUrl
+      });
+    }
+  });
+}
+
+function addScreenshot(screenshots, seen, screenshot) {
+  if (!isDataImage(screenshot.dataUrl) || seen.has(screenshot.dataUrl)) return;
+  seen.add(screenshot.dataUrl);
+  screenshots.push(screenshot);
+}
+
+function isDataImage(value) {
+  return typeof value === "string" && value.startsWith("data:image/");
+}
+
 function buildReportPayloadPreview(payload, stats) {
-  const report = payload?.report && typeof payload.report === "object" ? payload.report : null;
+  const wrappedReport = payload?.report && typeof payload.report === "object" ? payload.report : null;
+  const directReport = isReportLikePayload(payload) ? payload : null;
+  const report = wrappedReport || directReport;
   if (!report) return null;
 
-  return removeEmptyPreviewFields({
-    ok: payload.ok,
-    shareId: payload.shareId,
-    rootUrl: payload.rootUrl,
-    version: payload.version,
-    createdAt: payload.createdAt,
-    expiresAt: payload.expiresAt,
-    report: buildReportPreview(report, stats),
+  if (wrappedReport) {
+    return removeEmptyPreviewFields({
+      ok: payload.ok,
+      shareId: payload.shareId,
+      rootUrl: payload.rootUrl,
+      version: payload.version,
+      createdAt: payload.createdAt,
+      expiresAt: payload.expiresAt,
+      report: buildReportPreview(report, stats),
+      __previewNote: "Large fields are omitted for browser rendering. Use the extension export or backend API for the full payload."
+    });
+  }
+
+  return {
+    ...buildReportPreview(report, stats),
     __previewNote: "Large fields are omitted for browser rendering. Use the extension export or backend API for the full payload."
-  });
+  };
+}
+
+function isReportLikePayload(value) {
+  return Boolean(value && typeof value === "object" && (
+    Array.isArray(value.tabs) ||
+    Array.isArray(value.events) ||
+    Array.isArray(value.screenshots) ||
+    value.screenshotBase64
+  ));
 }
 
 function buildReportPreview(report, stats) {
@@ -679,7 +779,7 @@ function compactScreenshot(screenshot, stats) {
     eventType: screenshot.eventType,
     severity: screenshot.severity,
     capturedAt: screenshot.capturedAt,
-    dataUrl: screenshot.dataUrl ? `[omitted dataUrl, ${formatBytes(screenshot.dataUrl.length)}]` : undefined,
+    dataUrl: screenshot.dataUrl ? `[rendered as image above, ${formatBytes(screenshot.dataUrl.length)}]` : undefined,
     dataUrlLength: screenshot.dataUrl?.length,
     error: screenshot.error
   });
