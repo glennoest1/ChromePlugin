@@ -595,6 +595,76 @@ footer {
   opacity: 0.72;
 }
 
+.screenshot-shell {
+  overflow: hidden;
+  margin-bottom: 18px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-panel);
+  box-shadow: var(--shadow);
+}
+
+.screenshot-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-elevated);
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+.screenshot-head span:first-child {
+  color: var(--text-primary);
+  font-weight: 750;
+}
+
+.screenshot-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 14px;
+  padding: 16px;
+}
+
+.screenshot-card {
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--soft-panel);
+}
+
+.screenshot-card img {
+  display: block;
+  width: 100%;
+  max-height: 420px;
+  object-fit: contain;
+  background: var(--code-bg);
+}
+
+.screenshot-card figcaption {
+  display: grid;
+  gap: 2px;
+  padding: 10px 12px;
+  border-top: 1px solid var(--border);
+}
+
+.screenshot-card strong,
+.screenshot-card span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.screenshot-card span {
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
 .json-shell {
   overflow: hidden;
   border: 1px solid var(--border);
