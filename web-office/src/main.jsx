@@ -199,6 +199,7 @@ function ReportPage({ copy, path, navigate }) {
   const [isLoading, setIsLoading] = useState(false);
   const jsonPreview = useMemo(() => reportPayload ? buildJsonPreview(reportPayload, copy) : null, [copy, reportPayload]);
   const screenshots = useMemo(() => reportPayload ? extractReportScreenshots(reportPayload, copy) : [], [copy, reportPayload]);
+  const hasDownloadableReport = Boolean(reportPayload);
 
   useEffect(() => {
     const nextShareId = getShareIdFromCurrentUrl();
@@ -245,6 +246,11 @@ function ReportPage({ copy, path, navigate }) {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const downloadJson = () => {
+    if (!reportPayload) return;
+    downloadJsonReportPayload(reportPayload, loadedShareId);
   };
 
   return (
@@ -304,7 +310,12 @@ function ReportPage({ copy, path, navigate }) {
       <section className="json-shell" aria-live="polite">
         <div className="json-head">
           <span>{loadedShareId ? `shareId: ${loadedShareId}` : copy.reportNoLoaded}</span>
-          <span>{isLoading ? copy.reportFetching : reportPayload ? copy.reportJsonPreviewStatus : copy.reportReady}</span>
+          <div className="json-head-actions">
+            <span>{isLoading ? copy.reportFetching : reportPayload ? copy.reportJsonPreviewStatus : copy.reportReady}</span>
+            <button className="json-download-button" type="button" onClick={downloadJson} disabled={!hasDownloadableReport}>
+              {copy.reportDownloadJson}
+            </button>
+          </div>
         </div>
         {error ? (
           <p className="json-message json-error">{error}</p>
@@ -648,6 +659,326 @@ function addScreenshot(screenshots, seen, screenshot) {
 
 function isDataImage(value) {
   return typeof value === "string" && value.startsWith("data:image/");
+}
+
+function downloadJsonReportPayload(payload, shareId = "") {
+  const report = getDownloadReportFromPayload(payload);
+  const downloadableValue = isReportLikePayload(report) ? buildJsonDownloadReport(report) : payload;
+  const json = JSON.stringify(downloadableValue, null, 2);
+  const stoppedAt = isReportLikePayload(report) ? report.stoppedAt : payload?.createdAt;
+  const filename = buildJsonDownloadFilename(stoppedAt, shareId);
+  downloadTextFile(json, filename, "application/json;charset=utf-8");
+}
+
+function getDownloadReportFromPayload(payload) {
+  if (payload?.report && typeof payload.report === "object") return payload.report;
+  return payload;
+}
+
+function buildJsonDownloadFilename(timestamp, shareId = "") {
+  const safeShareId = sanitizeFilenameSegment(shareId);
+  if (safeShareId) return `bug-report-${safeShareId}.json`;
+  return `bug-report-${formatFileDate(new Date(timestamp || Date.now()))}.json`;
+}
+
+function downloadTextFile(content, filename, mimeType) {
+  const blob = new Blob([content], { type: mimeType });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+}
+
+function buildJsonDownloadReport(report) {
+  const tabs = getDownloadReportTabs(report);
+  const normalizedEvents = dedupeDownloadReportEvents(getDownloadReportEvents(report), tabs);
+  const eventCountsByTab = countDownloadEventsByTab(normalizedEvents);
+  const screenshots = dedupeDownloadReportScreenshots(getDownloadReportScreenshots(report));
+  const screenshotByTab = new Map(screenshots.map((screenshot) => [String(screenshot.tabId), screenshot.screenshotId]));
+  const rootScreenshot = screenshots.find((screenshot) => screenshot.tabId === report.rootTabId) || screenshots[0] || null;
+  const summary = buildDownloadSummary(report, tabs, normalizedEvents, screenshots);
+
+  return removeEmptyDownloadFields({
+    version: report.version,
+    mode: report.mode,
+    rootTabId: report.rootTabId,
+    startedAt: report.startedAt,
+    stoppedAt: report.stoppedAt,
+    durationSeconds: report.durationSeconds,
+    summary,
+    events: normalizedEvents,
+    tabs: tabs.map((tab) => buildDownloadTab(
+      tab,
+      eventCountsByTab.get(String(tab.tabId)) || 0,
+      screenshotByTab.get(String(tab.tabId)) || null
+    )),
+    replayEventCount: report.replayEventCount,
+    replayTabs: report.replayTabs || [],
+    replayStatus: report.replayStatus || null,
+    screenshots,
+    primaryScreenshotId: rootScreenshot?.screenshotId || null,
+    screenshotError: screenshots.length ? null : report.screenshotError || null,
+    aiExplanation: report.aiExplanation || null
+  });
+}
+
+function buildDownloadTab(tab, eventCount, screenshotId) {
+  return removeEmptyDownloadFields({
+    tabId: tab.tabId,
+    title: tab.title || "",
+    url: tab.url || "",
+    windowId: tab.windowId,
+    startedAt: tab.startedAt,
+    activeRanges: tab.activeRanges,
+    eventCount,
+    replay: tab.replay ? {
+      eventCount: getDownloadTabReplayEventCount(tab),
+      truncated: Boolean(tab.replay.truncated),
+      truncatedReason: tab.replay.truncatedReason || null
+    } : null,
+    screenshotId,
+    screenshotError: tab.screenshotError || null
+  });
+}
+
+function buildDownloadSummary(report, tabs, events, screenshots) {
+  return {
+    ...(report.summary || {}),
+    tabCount: tabs.length,
+    totalEvents: events.length,
+    totalReplayEvents: getTotalDownloadReplayEvents(report),
+    screenshotCount: screenshots.length
+  };
+}
+
+function getDownloadReportTabs(report) {
+  if (Array.isArray(report?.tabs)) return report.tabs;
+  return [{
+    tabId: report?.tabId || report?.rootTabId || 0,
+    url: report?.tabUrl || "",
+    title: report?.tabTitle || "",
+    events: Array.isArray(report?.events) ? report.events : []
+  }];
+}
+
+function getDownloadReportEvents(report) {
+  const tabEvents = getDownloadReportTabs(report).flatMap((tab) => Array.isArray(tab.events) ? tab.events : []);
+  if (tabEvents.length) return tabEvents;
+  return Array.isArray(report?.events) ? report.events : [];
+}
+
+function getDownloadTabReplayEvents(tab) {
+  if (Array.isArray(tab?.replay?.events)) return tab.replay.events;
+  if (Array.isArray(tab?.replayEvents)) return tab.replayEvents;
+  return [];
+}
+
+function getDownloadTabReplayEventCount(tab) {
+  if (Number(tab?.replay?.eventCount)) return Number(tab.replay.eventCount);
+  if (Number(tab?.replayEventCount)) return Number(tab.replayEventCount);
+  return getDownloadTabReplayEvents(tab).length;
+}
+
+function getTotalDownloadReplayEvents(report) {
+  if (Number(report?.summary?.totalReplayEvents)) return Number(report.summary.totalReplayEvents);
+  if (Number(report?.replayEventCount)) return Number(report.replayEventCount);
+  return getDownloadReportTabs(report).reduce((total, tab) => total + getDownloadTabReplayEventCount(tab), 0);
+}
+
+function getDownloadReportScreenshots(report) {
+  if (Array.isArray(report?.screenshots) && report.screenshots.length) {
+    return report.screenshots.filter((screenshot) => screenshot?.dataUrl);
+  }
+
+  const tabScreenshots = getDownloadReportTabs(report)
+    .filter((tab) => tab?.screenshot?.dataUrl)
+    .map((tab) => ({
+      tabId: tab.tabId,
+      title: tab.title || tab.screenshot.title || "",
+      url: tab.url || tab.screenshot.url || "",
+      dataUrl: tab.screenshot.dataUrl,
+      reason: tab.screenshot.reason || null,
+      eventType: tab.screenshot.eventType || null,
+      severity: tab.screenshot.severity || null,
+      capturedAt: tab.screenshot.capturedAt || null
+    }));
+  if (tabScreenshots.length) return tabScreenshots;
+
+  if (report?.screenshotBase64) {
+    const tabs = getDownloadReportTabs(report);
+    const rootTab = tabs.find((tab) => tab.tabId === report.rootTabId) || tabs[0] || {};
+    return [{
+      tabId: rootTab.tabId || report.rootTabId || 0,
+      title: rootTab.title || report.tabTitle || "",
+      url: rootTab.url || report.tabUrl || "",
+      dataUrl: report.screenshotBase64,
+      reason: "legacy",
+      eventType: null,
+      severity: null,
+      capturedAt: null
+    }];
+  }
+
+  return [];
+}
+
+function countDownloadEventsByTab(events) {
+  return (Array.isArray(events) ? events : []).reduce((counts, event) => {
+    const tabKey = String(event?.tabId || "");
+    counts.set(tabKey, (counts.get(tabKey) || 0) + 1);
+    return counts;
+  }, new Map());
+}
+
+function dedupeDownloadReportEvents(events, tabs) {
+  const tabsById = new Map(tabs.map((tab) => [String(tab.tabId), tab]));
+  const byKey = new Map();
+
+  for (const event of Array.isArray(events) ? events : []) {
+    if (!event || typeof event !== "object") continue;
+    const key = getDownloadEventDedupeKey(event, tabsById);
+    const existing = byKey.get(key);
+    if (!existing || shouldPreferDownloadEvent(event, existing)) {
+      byKey.set(key, event);
+    }
+  }
+
+  return Array.from(byKey.values())
+    .sort((a, b) => Number(a.timestamp || 0) - Number(b.timestamp || 0))
+    .map((event) => {
+      if (event?.type === "network" || event?.type === "networkError") {
+        return {
+          ...event,
+          url: canonicalDownloadEventUrl(event, tabsById)
+        };
+      }
+      return { ...event };
+    });
+}
+
+function getDownloadEventDedupeKey(event, tabsById) {
+  if (event?.type === "network" || event?.type === "networkError") {
+    return [
+      "network",
+      event.tabId || "",
+      String(event.method || "GET").toUpperCase(),
+      canonicalDownloadEventUrl(event, tabsById),
+      Number(event.statusCode || 0),
+      event.triggeredByActionId || "",
+      event.error || ""
+    ].join("|");
+  }
+
+  if (event?.eventId) return `eventId|${event.eventId}`;
+
+  return [
+    "event",
+    event?.tabId || "",
+    event?.type || "",
+    event?.timestamp || "",
+    event?.selector || "",
+    event?.message || "",
+    event?.url || ""
+  ].join("|");
+}
+
+function shouldPreferDownloadEvent(nextEvent, currentEvent) {
+  if (nextEvent.type === "network" && currentEvent.type === "networkError") return true;
+  if (nextEvent.type === "networkError" && currentEvent.type === "network") return false;
+  return getDownloadEventRichnessScore(nextEvent) > getDownloadEventRichnessScore(currentEvent);
+}
+
+function getDownloadEventRichnessScore(event) {
+  return [
+    event.responseBody,
+    event.responseHeaders && Object.keys(event.responseHeaders).length,
+    event.requestBody,
+    event.requestHeaders && Object.keys(event.requestHeaders).length,
+    Number.isFinite(event.durationMs),
+    event.source
+  ].reduce((score, value) => score + (value ? 1 : 0), 0);
+}
+
+function canonicalDownloadEventUrl(event, tabsById) {
+  const rawUrl = String(event?.url || "");
+  const tab = tabsById.get(String(event?.tabId));
+
+  try {
+    const parsed = new URL(rawUrl, tab?.url || undefined);
+    parsed.hash = "";
+    return sanitizeUrl(parsed.toString());
+  } catch {
+    return sanitizeUrl(rawUrl);
+  }
+}
+
+function dedupeDownloadReportScreenshots(screenshots) {
+  const seen = new Map();
+  const result = [];
+
+  for (const screenshot of Array.isArray(screenshots) ? screenshots : []) {
+    if (!screenshot?.dataUrl) continue;
+    const existingId = seen.get(screenshot.dataUrl);
+    if (existingId) continue;
+
+    const screenshotId = `screenshot-${result.length + 1}`;
+    seen.set(screenshot.dataUrl, screenshotId);
+    result.push({
+      screenshotId,
+      tabId: screenshot.tabId,
+      title: screenshot.title || "",
+      url: screenshot.url || "",
+      reason: screenshot.reason || null,
+      eventType: screenshot.eventType || null,
+      severity: screenshot.severity || null,
+      capturedAt: screenshot.capturedAt || null,
+      dataUrlOmitted: true,
+      dataUrlLength: screenshot.dataUrl.length
+    });
+  }
+
+  return result;
+}
+
+function sanitizeUrl(value) {
+  const text = String(value || "");
+  if (!text) return "";
+
+  try {
+    const url = new URL(text);
+    url.hash = "";
+    for (const key of Array.from(url.searchParams.keys())) {
+      if (/password|token|secret|authorization|cookie|api[-_]?key|session|set-cookie/i.test(key)) {
+        url.searchParams.set(key, "[redacted]");
+      }
+    }
+    return url.toString();
+  } catch {
+    return text.split("#")[0];
+  }
+}
+
+function sanitizeFilenameSegment(value) {
+  return String(value || "")
+    .trim()
+    .replace(/[^a-z0-9._-]+/gi, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 80);
+}
+
+function formatFileDate(date) {
+  const pad = (number) => String(number).padStart(2, "0");
+  return `${date.getFullYear()}${pad(date.getMonth() + 1)}${pad(date.getDate())}-${pad(date.getHours())}${pad(date.getMinutes())}${pad(date.getSeconds())}`;
+}
+
+function removeEmptyDownloadFields(value) {
+  return Object.fromEntries(Object.entries(value).filter(([, fieldValue]) =>
+    fieldValue !== undefined && fieldValue !== null
+  ));
 }
 
 function buildReportPayloadPreview(payload, stats, copy = COPY.en) {

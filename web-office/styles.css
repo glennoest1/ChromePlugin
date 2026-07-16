@@ -692,6 +692,40 @@ footer {
   white-space: nowrap;
 }
 
+.json-head-actions {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  min-width: 0;
+}
+
+.json-download-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 32px;
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--bg-panel);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 750;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.json-download-button:hover:not(:disabled) {
+  border-color: var(--border-focus);
+}
+
+.json-download-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.56;
+}
+
 .json-message {
   margin: 0;
   padding: 24px;
@@ -774,6 +808,7 @@ code {
 
 a:focus-visible,
 .btn:focus-visible,
+.json-download-button:focus-visible,
 .theme-toggle:focus-visible {
   outline: 2px solid var(--border-focus);
   outline-offset: 2px;
@@ -832,6 +867,16 @@ a:focus-visible,
 
   .report-search .btn {
     width: 100%;
+  }
+
+  .json-head {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .json-head-actions {
+    width: 100%;
+    justify-content: space-between;
   }
 
   h1 {
