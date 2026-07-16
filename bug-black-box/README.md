@@ -12,7 +12,7 @@ Phase 1 also includes multi-tab recording, rrweb session replay, a local replay 
 4. Select this folder:
 
    ```text
-   E:\Bug Black Box\bug-black-box
+   E:\Chrome-Plugin-Bug-Black-Box-Extension\bug-black-box
    ```
 
 5. After any code change, click the extension reload button in `chrome://extensions`.
@@ -24,7 +24,7 @@ Chrome 111 or newer is required because `injected.js` runs with `"world": "MAIN"
 Use the included demo page:
 
 ```text
-E:\Bug Black Box\test-page.html
+E:\Chrome-Plugin-Bug-Black-Box-Extension\test-page.html
 ```
 
 Recommended demo flow:
@@ -32,7 +32,7 @@ Recommended demo flow:
 1. Serve the workspace locally:
 
    ```powershell
-   cd "E:\Bug Black Box"
+   cd "E:\Chrome-Plugin-Bug-Black-Box-Extension"
    python -m http.server 8080
    ```
 

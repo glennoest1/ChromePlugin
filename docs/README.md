@@ -16,7 +16,7 @@ This folder describes the current Bug Black Box project as implemented in the re
 ## Project Map
 
 ```text
-ChromePlugin/
+Chrome-Plugin-Bug-Black-Box-Extension/
   README.md
   test-page.html
   docs/
